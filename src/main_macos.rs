@@ -52,8 +52,9 @@ struct MetalshaderApp {
     button_press_duration: [f32; 5],  // Duration in seconds for each button
     scroll_x: f32,
     scroll_y: f32,
-    zoom_mouse_x: f32,     // Mouse position when zoom last changed (for fixed-point zoom)
-    zoom_mouse_y: f32,
+    last_scroll_y: f32,    // Previous scroll_y to detect zoom changes
+    zoom_center_x: f32,    // Center adjustment for zoom-at-cursor
+    zoom_center_y: f32,
     pan_offset_x: f32,     // Pan in pixels (for shader)
     pan_offset_y: f32,
     base_pan_x: f32,       // Pan in complex-plane units (zoom-independent)
@@ -160,8 +161,9 @@ impl MetalshaderApp {
             button_press_duration: [0.0; 5],
             scroll_x: 0.0,
             scroll_y: 0.0,
-            zoom_mouse_x: 0.5,  // Start at screen center
-            zoom_mouse_y: 0.5,
+            last_scroll_y: 0.0,
+            zoom_center_x: 0.0,
+            zoom_center_y: 0.0,
             pan_offset_x: 0.0,
             pan_offset_y: 0.0,
             base_pan_x: 0.0,
@@ -235,8 +237,8 @@ impl MetalshaderApp {
                 let elapsed = self.start_time.elapsed().as_secs_f32();
                 self.scroll_x = 0.0;
                 self.scroll_y = elapsed;  // For auto-zoom shaders: reset time offset
-                self.zoom_mouse_x = 0.5;  // Reset zoom center to screen center
-                self.zoom_mouse_y = 0.5;
+                self.zoom_center_x = 0.0;
+                self.zoom_center_y = 0.0;
                 self.pan_offset_x = 0.0;
                 self.pan_offset_y = 0.0;
                 self.base_pan_x = 0.0;
@@ -244,22 +246,36 @@ impl MetalshaderApp {
                 println!("\n[R] Reset zoom and pan");
             }
             PhysicalKey::Code(KeyCode::Equal) | PhysicalKey::Code(KeyCode::NumpadAdd) => {
+                let old_zoom = (self.scroll_y * 0.1).exp().sqrt();
                 self.scroll_y += 1.0;
-                // Update zoom reference mouse when zooming with keyboard
+                let new_zoom = (self.scroll_y * 0.1).exp().sqrt();
+
+                // Adjust center for zoom-at-cursor
                 if let Some(window) = &self.window {
                     let window_size = window.inner_size();
-                    self.zoom_mouse_x = (self.mouse_x / window_size.width as f64) as f32;
-                    self.zoom_mouse_y = (self.mouse_y / window_size.height as f64) as f32;
+                    let mouse_x_norm = (self.mouse_x / window_size.width as f64) as f32;
+                    let mouse_y_norm = (self.mouse_y / window_size.height as f64) as f32;
+                    let aspect = window_size.width as f32 / window_size.height as f32;
+
+                    self.zoom_center_x += (mouse_x_norm - 0.5) * 3.0 * aspect * (1.0/old_zoom - 1.0/new_zoom);
+                    self.zoom_center_y += (mouse_y_norm - 0.5) * 3.0 * (1.0/old_zoom - 1.0/new_zoom);
                 }
                 println!("\n[+] Zoom in: {:.1}", self.scroll_y);
             }
             PhysicalKey::Code(KeyCode::Minus) | PhysicalKey::Code(KeyCode::NumpadSubtract) => {
+                let old_zoom = (self.scroll_y * 0.1).exp().sqrt();
                 self.scroll_y -= 1.0;
-                // Update zoom reference mouse when zooming with keyboard
+                let new_zoom = (self.scroll_y * 0.1).exp().sqrt();
+
+                // Adjust center for zoom-at-cursor
                 if let Some(window) = &self.window {
                     let window_size = window.inner_size();
-                    self.zoom_mouse_x = (self.mouse_x / window_size.width as f64) as f32;
-                    self.zoom_mouse_y = (self.mouse_y / window_size.height as f64) as f32;
+                    let mouse_x_norm = (self.mouse_x / window_size.width as f64) as f32;
+                    let mouse_y_norm = (self.mouse_y / window_size.height as f64) as f32;
+                    let aspect = window_size.width as f32 / window_size.height as f32;
+
+                    self.zoom_center_x += (mouse_x_norm - 0.5) * 3.0 * aspect * (1.0/old_zoom - 1.0/new_zoom);
+                    self.zoom_center_y += (mouse_y_norm - 0.5) * 3.0 * (1.0/old_zoom - 1.0/new_zoom);
                 }
                 println!("\n[-] Zoom out: {:.1}", self.scroll_y);
             }
@@ -401,7 +417,7 @@ impl ApplicationHandler for MetalshaderApp {
                             i_button_4: self.button_press_duration[3],
                             i_button_5: self.button_press_duration[4],
                             i_pan: [self.pan_offset_x, self.pan_offset_y],
-                            i_zoom_mouse: [self.zoom_mouse_x, self.zoom_mouse_y],
+                            i_zoom_mouse: [self.zoom_center_x, self.zoom_center_y],
                         };
 
                         match renderer.render_frame(&ubo) {
@@ -484,6 +500,10 @@ impl ApplicationHandler for MetalshaderApp {
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 use winit::event::MouseScrollDelta;
+
+                // Calculate zoom change for center adjustment
+                let old_zoom = (self.scroll_y * 0.1).exp().sqrt();
+
                 match delta {
                     MouseScrollDelta::LineDelta(x, y) => {
                         self.scroll_x += x;
@@ -494,12 +514,20 @@ impl ApplicationHandler for MetalshaderApp {
                         self.scroll_y += (pos.y / 10.0) as f32;
                     }
                 }
-                // Update zoom reference mouse position when scrolling
-                // This locks the zoom center to where the mouse is NOW
+
+                let new_zoom = (self.scroll_y * 0.1).exp().sqrt();
+
+                // Adjust center to keep point under cursor fixed
                 if let Some(window) = &self.window {
                     let window_size = window.inner_size();
-                    self.zoom_mouse_x = (self.mouse_x / window_size.width as f64) as f32;
-                    self.zoom_mouse_y = (self.mouse_y / window_size.height as f64) as f32;
+                    let mouse_x_norm = (self.mouse_x / window_size.width as f64) as f32;
+                    let mouse_y_norm = (self.mouse_y / window_size.height as f64) as f32;
+                    let aspect = window_size.width as f32 / window_size.height as f32;
+
+                    // Calculate adjustment to keep point under cursor fixed
+                    // Same formula as shader: (mouse - 0.5) * viewport_size * (1/old_zoom - 1/new_zoom)
+                    self.zoom_center_x += (mouse_x_norm - 0.5) * 3.0 * aspect * (1.0/old_zoom - 1.0/new_zoom);
+                    self.zoom_center_y += (mouse_y_norm - 0.5) * 3.0 * (1.0/old_zoom - 1.0/new_zoom);
                 }
             }
             _ => {}
