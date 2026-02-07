@@ -49,8 +49,10 @@ struct MetalshaderApp {
     button_press_duration: [f32; 5],  // Duration in seconds for each button
     scroll_x: f32,
     scroll_y: f32,
-    pan_offset_x: f32,
+    pan_offset_x: f32,     // Pan in pixels (for shader)
     pan_offset_y: f32,
+    base_pan_x: f32,       // Pan in complex-plane units (zoom-independent)
+    base_pan_y: f32,
     last_frame_time: Instant,
 }
 
@@ -153,6 +155,8 @@ impl MetalshaderApp {
             scroll_y: 0.0,
             pan_offset_x: 0.0,
             pan_offset_y: 0.0,
+            base_pan_x: 0.0,
+            base_pan_y: 0.0,
             last_frame_time: Instant::now(),
         }
     }
@@ -223,6 +227,8 @@ impl MetalshaderApp {
                 self.scroll_y = 0.0;
                 self.pan_offset_x = 0.0;
                 self.pan_offset_y = 0.0;
+                self.base_pan_x = 0.0;
+                self.base_pan_y = 0.0;
                 println!("\n[R] Reset zoom and pan");
             }
             PhysicalKey::Code(KeyCode::Equal) | PhysicalKey::Code(KeyCode::NumpadAdd) => {
@@ -347,6 +353,12 @@ impl ApplicationHandler for MetalshaderApp {
                             [scaled_mouse_x, scaled_mouse_y, -scaled_click_x, -scaled_click_y]
                         };
 
+                        // Convert base_pan (complex-plane units) to pan_offset (pixels) for shader
+                        // This makes pan scale correctly with zoom level
+                        let current_zoom = (self.scroll_y * 0.1).exp();
+                        self.pan_offset_x = -self.base_pan_x * size.width as f32 * current_zoom / 3.0;
+                        self.pan_offset_y = -self.base_pan_y * size.height as f32 * current_zoom / 3.0;
+
                         let ubo = ShaderToyUBO {
                             i_resolution: [size.width as f32, size.height as f32, 1.0],
                             i_time: elapsed,
@@ -417,11 +429,23 @@ impl ApplicationHandler for MetalshaderApp {
                             self.button_press_duration[0] = 0.0;
                         } else {
                             if self.mouse_left_pressed {
-                                // Accumulate drag offset into pan offset
-                                let drag_delta_x = self.mouse_x - self.mouse_click_x;
-                                let drag_delta_y = self.mouse_y - self.mouse_click_y;
-                                self.pan_offset_x += drag_delta_x as f32;
-                                self.pan_offset_y += drag_delta_y as f32;
+                                if let Some(window) = &self.window {
+                                    let size = window.inner_size();
+                                    let drag_delta_x = self.mouse_x - self.mouse_click_x;
+                                    let drag_delta_y = self.mouse_y - self.mouse_click_y;
+
+                                    // Normalize to 0-1 range
+                                    let norm_drag_x = drag_delta_x as f32 / size.width as f32;
+                                    let norm_drag_y = drag_delta_y as f32 / size.height as f32;
+
+                                    // Calculate current zoom
+                                    let current_zoom = (self.scroll_y * 0.1).exp();
+                                    let aspect = size.width as f32 / size.height as f32;
+
+                                    // Convert to complex-plane units (accounts for current zoom and aspect)
+                                    self.base_pan_x += norm_drag_x * 3.0 / current_zoom / aspect;
+                                    self.base_pan_y += norm_drag_y * 3.0 / current_zoom;
+                                }
                             }
                             self.mouse_left_pressed = false;
                             self.button_press_duration[0] = 0.0;
