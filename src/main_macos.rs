@@ -442,9 +442,13 @@ impl ApplicationHandler for MetalshaderApp {
                                     let current_zoom = (self.scroll_y * 0.1).exp();
                                     let aspect = size.width as f32 / size.height as f32;
 
+                                    // Exponential dampening: use zoom^1.5 for softer pan at high zoom
+                                    // This makes sensitivity drop off more aggressively than linear 1/zoom
+                                    let zoom_dampening = current_zoom.powf(1.5);
+
                                     // Convert to complex-plane units (accounts for current zoom and aspect)
-                                    self.base_pan_x += norm_drag_x * 3.0 / current_zoom / aspect;
-                                    self.base_pan_y += norm_drag_y * 3.0 / current_zoom;
+                                    self.base_pan_x += norm_drag_x * 3.0 / zoom_dampening / aspect;
+                                    self.base_pan_y += norm_drag_y * 3.0 / zoom_dampening;
                                 }
                             }
                             self.mouse_left_pressed = false;
