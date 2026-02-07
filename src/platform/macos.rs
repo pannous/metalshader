@@ -17,13 +17,11 @@ use winit::window::Window;
 /// Shared state between Display and Input
 struct SharedState {
     pending_events: VecDeque<KeyEvent>,
-    window_should_close: bool,
 }
 
 pub struct MacOSDisplay {
     width: u32,
     height: u32,
-    state: Arc<Mutex<SharedState>>,
 }
 
 impl DisplayBackend for MacOSDisplay {
@@ -39,10 +37,6 @@ impl DisplayBackend for MacOSDisplay {
         Ok(Self {
             width: 1280,
             height: 800,
-            state: Arc::new(Mutex::new(SharedState {
-                pending_events: VecDeque::new(),
-                window_should_close: false,
-            })),
         })
     }
 
@@ -82,16 +76,10 @@ impl DisplayBackend for MacOSDisplay {
         Ok((self.width, self.height))
     }
 
-    fn present(&mut self, data: &[u8], _row_pitch: usize) -> Result<(), Box<dyn Error>> {
+    fn present(&mut self, _data: &[u8], _row_pitch: usize) -> Result<(), Box<dyn Error>> {
         // For now, just verify data is present
         // Full windowed rendering would require swapchain integration
-        static mut FRAME_COUNT: u64 = 0;
-        unsafe {
-            FRAME_COUNT += 1;
-            if FRAME_COUNT % 100 == 0 {
-                println!("Rendered {} frames (data size: {} bytes)", FRAME_COUNT, data.len());
-            }
-        }
+        // Rendering happens in memory only (headless mode)
         Ok(())
     }
 }
@@ -110,7 +98,6 @@ impl InputBackend for MacOSInput {
         Ok(Self {
             state: Arc::new(Mutex::new(SharedState {
                 pending_events: VecDeque::new(),
-                window_should_close: false,
             })),
         })
     }
@@ -124,6 +111,7 @@ impl InputBackend for MacOSInput {
     }
 }
 
+#[allow(dead_code)]
 fn map_key_code(key: &PhysicalKey) -> Option<KeyEvent> {
     match key {
         PhysicalKey::Code(KeyCode::ArrowLeft) => Some(KeyEvent::Left),
@@ -145,9 +133,9 @@ fn map_key_code(key: &PhysicalKey) -> Option<KeyEvent> {
     }
 }
 
-// Helper to create standalone window for testing
+// Helper to create standalone window for testing (not used in headless mode)
 #[allow(dead_code)]
-pub fn create_window() -> Result<(EventLoop<()>, Window), Box<dyn Error>> {
+pub fn create_window() -> Result<(EventLoop<()>, Arc<Window>), Box<dyn Error>> {
     let event_loop = EventLoop::new()?;
 
     let window_attributes = Window::default_attributes()
@@ -155,7 +143,7 @@ pub fn create_window() -> Result<(EventLoop<()>, Window), Box<dyn Error>> {
         .with_inner_size(PhysicalSize::new(1280, 800))
         .with_resizable(true);
 
-    let window = event_loop.create_window(window_attributes)?;
+    let window = Arc::new(event_loop.create_window(window_attributes)?);
 
     println!("Created macOS window: {}x{}", 1280, 800);
     Ok((event_loop, window))

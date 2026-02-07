@@ -70,6 +70,7 @@ impl ShaderManager {
         self.shaders.is_empty()
     }
 
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.shaders.len()
     }

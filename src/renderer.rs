@@ -7,6 +7,7 @@ use std::io::Read;
 use std::path::Path;
 
 pub struct VulkanRenderer {
+    #[allow(dead_code)]
     entry: ash::Entry,
     instance: ash::Instance,
     device: ash::Device,
@@ -51,12 +52,29 @@ impl VulkanRenderer {
         unsafe {
             let entry = ash::Entry::load()?;
 
-            // Create instance
+            // Create instance with MoltenVK portability extensions for macOS
             let app_info = vk::ApplicationInfo::default()
                 .api_version(vk::make_api_version(0, 1, 2, 0));
 
+            #[cfg(target_os = "macos")]
+            let extension_names = vec![
+                b"VK_KHR_portability_enumeration\0".as_ptr() as *const i8,
+                b"VK_KHR_get_physical_device_properties2\0".as_ptr() as *const i8,
+            ];
+
+            #[cfg(not(target_os = "macos"))]
+            let extension_names: Vec<*const i8> = vec![];
+
+            #[cfg(target_os = "macos")]
+            let create_flags = vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR;
+
+            #[cfg(not(target_os = "macos"))]
+            let create_flags = vk::InstanceCreateFlags::empty();
+
             let create_info = vk::InstanceCreateInfo::default()
-                .application_info(&app_info);
+                .application_info(&app_info)
+                .enabled_extension_names(&extension_names)
+                .flags(create_flags);
 
             let instance = entry.create_instance(&create_info, None)?;
 
@@ -67,13 +85,22 @@ impl VulkanRenderer {
 
             let mem_properties = instance.get_physical_device_memory_properties(physical_device);
 
-            // Create device
+            // Create device with portability subset for MoltenVK
             let queue_info = vk::DeviceQueueCreateInfo::default()
                 .queue_family_index(0)
                 .queue_priorities(&[1.0]);
 
+            #[cfg(target_os = "macos")]
+            let device_extensions = vec![
+                b"VK_KHR_portability_subset\0".as_ptr() as *const i8,
+            ];
+
+            #[cfg(not(target_os = "macos"))]
+            let device_extensions: Vec<*const i8> = vec![];
+
             let device_create_info = vk::DeviceCreateInfo::default()
-                .queue_create_infos(std::slice::from_ref(&queue_info));
+                .queue_create_infos(std::slice::from_ref(&queue_info))
+                .enabled_extension_names(&device_extensions);
 
             let device = instance.create_device(physical_device, &device_create_info, None)?;
             let queue = device.get_device_queue(0, 0);

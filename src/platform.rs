@@ -59,6 +59,7 @@ pub trait InputBackend {
 ///
 /// These events represent the logical actions the user wants to perform,
 /// abstracted from platform-specific scan codes or key codes
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeyEvent {
     /// Navigate to previous shader
