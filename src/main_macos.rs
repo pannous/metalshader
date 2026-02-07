@@ -341,31 +341,11 @@ impl ApplicationHandler for MetalshaderApp {
                             self.button_press_duration[2] += delta_time;
                         }
 
-                        // Smooth mouse movement to prevent jitter at high zoom
-                        // Calculate current zoom to determine smoothing factor
-                        // Different formulas for auto-zoom vs manual zoom shaders
-                        let is_autozoom = self.shader_manager.get(self.current_shader_idx)
-                            .map(|s| s.name.contains("autozoom"))
-                            .unwrap_or(false);
-                        let current_zoom = if is_autozoom {
-                            // Auto-zoom mode: zoom = exp((time - scroll_y) * ZOOM_SPEED)
-                            const ZOOM_SPEED: f32 = 0.15;
-                            let effective_time = elapsed - self.scroll_y;
-                            (effective_time * ZOOM_SPEED).exp().clamp(0.01, 1e10)
-                        } else {
-                            // Manual zoom mode: zoom = sqrt(exp(scroll_y * 0.1))
-                            // Matches mandelbrot_simple.frag and other manual shaders
-                            (self.scroll_y * 0.1).exp().sqrt().clamp(0.01, 1e10)
-                        };
-
-                        // Interpolation factor: higher zoom = more smoothing
-                        // At zoom=1: lerp=1.0 (instant), at high zoom: lerp→0 (very smooth)
-                        // Using power 1.2 for aggressive smoothing: zoom=100 → lerp=0.004, zoom=1000 → lerp=0.0002
-                        let lerp_factor = (1.0_f32 / current_zoom.powf(1.2)).clamp(0.0001, 1.0);
-
-                        // Also scale by delta_time for frame-rate independence
-                        // Multiply by 0.5 to make it 2x slower for more stable focal point
-                        let smooth_speed = lerp_factor * delta_time * 60.0 * 0.5; // Normalize to 60fps, then 2x slower
+                        // Generic mouse smoothing (shader-agnostic)
+                        // Provides comfortable smoothing without viewer needing to know zoom logic
+                        // Time constant: ~200ms (feels natural, reduces jitter without lag)
+                        const SMOOTH_FACTOR: f32 = 0.08;  // 8% blend per frame @ 60fps
+                        let smooth_speed = (SMOOTH_FACTOR * delta_time * 60.0).min(1.0);
 
                         self.mouse_smooth_x += (self.mouse_x - self.mouse_smooth_x) * smooth_speed.min(1.0) as f64;
                         self.mouse_smooth_y += (self.mouse_y - self.mouse_smooth_y) * smooth_speed.min(1.0) as f64;
