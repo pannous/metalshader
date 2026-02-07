@@ -1,10 +1,17 @@
 
-## 2026-02-08: Fixed unwanted panning in mandelbrot_simple
+## 2026-02-08: Fixed unwanted panning while preserving zoom-at-cursor
 
-**Problem:** View was panning whenever mouse moved, even without dragging.
+**Problem:** View was panning whenever mouse moved, even without dragging. The zoom-at-cursor feature was causing this.
 
-**Root cause:** Shader had "zoom-at-cursor" logic (lines 95-104) that calculated `deltaMouse = mouse - referenceMouse` on every frame. This caused the center to shift based on mouse movement, not just during drag operations.
+**Root cause:** Shader used `deltaMouse = mouse - referenceMouse` which changed on every frame as mouse moved. The formula simplified to using current `mouse` position, so any mouse movement caused the center to shift.
 
-**Fix:** Removed the zoom-at-cursor section entirely. View now only pans during actual drag operations (when `iMouse.z > 0`).
+**Solution:** Added `iZoomMouse` uniform that stores mouse position when zooming starts.
 
-**File modified:** `/opt/3d/shaders/mandelbrot_simple.frag`
+**Implementation:**
+1. **Rust viewer:** Added `zoom_mouse_x/y` fields that only update when scrolling happens (MouseWheel, +/- keys)
+2. **Shader:** Use fixed `iZoomMouse` instead of current `mouse` in zoom formula
+3. **Result:** Zoom centers on cursor when you scroll, but moving mouse without scrolling doesn't pan the view
+
+**Files modified:**
+- `/opt/3d/metalshader/src/main_macos.rs`
+- `/opt/3d/shaders/mandelbrot_simple.frag`
