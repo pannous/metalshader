@@ -1,0 +1,8 @@
+# Cross-compilation configuration for Redox OS
+
+[target.aarch64-unknown-redox]
+linker = "aarch64-unknown-redox-gcc"
+
+# Optional: Set default target for convenience
+# [build]
+# target = "aarch64-unknown-redox"

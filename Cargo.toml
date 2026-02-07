@@ -1,0 +1,21 @@
+[package]
+name = "metalshader"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ash = "0.38"
+libc = "0.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+drm = "0.14"  # new - modern DRM API with DumbBuffer support
+input-linux = "0.7"  # Latest available on crates.io
+
+[target.'cfg(target_os = "redox")'.dependencies]
+orbclient = "0.3.47"  # For Event types and input handling
+syscall = "0.4"       # For Redox syscalls (fcntl, etc.)
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
