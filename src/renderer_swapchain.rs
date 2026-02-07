@@ -587,6 +587,86 @@ impl SwapchainRenderer {
         }
     }
 
+    pub fn recreate_swapchain(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        unsafe {
+            self.device.device_wait_idle()?;
+
+            // Destroy old framebuffers
+            for &framebuffer in &self.framebuffers {
+                self.device.destroy_framebuffer(framebuffer, None);
+            }
+
+            // Destroy old image views
+            for &view in &self.swapchain_image_views {
+                self.device.destroy_image_view(view, None);
+            }
+
+            let old_swapchain = self.swapchain;
+
+            // Create new swapchain
+            let (swapchain, swapchain_images, swapchain_extent, swapchain_format) =
+                Self::create_swapchain(
+                    &self.surface_loader,
+                    &self.swapchain_loader,
+                    self.physical_device,
+                    self.surface,
+                    &self.window,
+                    old_swapchain,
+                )?;
+
+            // Destroy old swapchain
+            self.swapchain_loader.destroy_swapchain(old_swapchain, None);
+
+            // Update swapchain data
+            self.swapchain = swapchain;
+            self.swapchain_images = swapchain_images.clone();
+            self.swapchain_extent = swapchain_extent;
+            self.swapchain_format = swapchain_format;
+
+            // Create new image views
+            self.swapchain_image_views = swapchain_images
+                .iter()
+                .map(|&image| {
+                    let create_info = vk::ImageViewCreateInfo::default()
+                        .image(image)
+                        .view_type(vk::ImageViewType::TYPE_2D)
+                        .format(swapchain_format)
+                        .subresource_range(vk::ImageSubresourceRange {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            base_mip_level: 0,
+                            level_count: 1,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        });
+                    self.device.create_image_view(&create_info, None)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+
+            // Create new framebuffers
+            self.framebuffers = self.swapchain_image_views
+                .iter()
+                .map(|&view| {
+                    let attachments = [view];
+                    let create_info = vk::FramebufferCreateInfo::default()
+                        .render_pass(self.render_pass)
+                        .attachments(&attachments)
+                        .width(swapchain_extent.width)
+                        .height(swapchain_extent.height)
+                        .layers(1);
+                    self.device.create_framebuffer(&create_info, None)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+
+            // Recreate pipeline with new viewport if a shader is loaded
+            if self.pipeline.is_some() {
+                // Pipeline recreation will be triggered by setting pipeline to None
+                // The load_shader function should be called again to recreate with correct viewport
+            }
+
+            Ok(())
+        }
+    }
+
     pub fn render_frame<T: Copy>(&mut self, ubo_data: &T) -> Result<(), Box<dyn std::error::Error>> {
         unsafe {
             let fence = self.in_flight_fences[self.current_frame];
@@ -600,7 +680,7 @@ impl SwapchainRenderer {
             ) {
                 Ok(result) => result,
                 Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
-                    // Swapchain needs recreation
+                    self.recreate_swapchain()?;
                     return Ok(());
                 }
                 Err(e) => return Err(e.into()),
@@ -691,7 +771,10 @@ impl SwapchainRenderer {
                 .image_indices(&image_indices);
 
             match self.swapchain_loader.queue_present(self.queue, &present_info) {
-                Ok(_) | Err(vk::Result::ERROR_OUT_OF_DATE_KHR | vk::Result::SUBOPTIMAL_KHR) => {}
+                Ok(_) => {}
+                Err(vk::Result::ERROR_OUT_OF_DATE_KHR | vk::Result::SUBOPTIMAL_KHR) => {
+                    self.recreate_swapchain()?;
+                }
                 Err(e) => return Err(e.into()),
             }
 

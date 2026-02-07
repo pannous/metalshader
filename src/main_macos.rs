@@ -263,8 +263,19 @@ impl ApplicationHandler for MetalshaderApp {
                     }
                 }
             }
-            WindowEvent::Resized(_new_size) => {
-                // Swapchain will be recreated automatically on next frame
+            WindowEvent::Resized(new_size) => {
+                if let Some(renderer) = &mut self.renderer {
+                    match renderer.recreate_swapchain() {
+                        Ok(_) => {
+                            println!("Swapchain recreated for {}x{}", new_size.width, new_size.height);
+                            // Trigger shader reload to recreate pipeline with new viewport
+                            self.reload_requested = true;
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to recreate swapchain: {}", e);
+                        }
+                    }
+                }
                 if let Some(window) = &self.window {
                     window.request_redraw();
                 }
