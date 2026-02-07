@@ -19,6 +19,8 @@ struct ShaderToyUBO {
     i_resolution: [f32; 3],
     i_time: f32,
     i_mouse: [f32; 4],
+    i_scroll: [f32; 2],  // Accumulated scroll offset (x, y) for zoom
+    i_pan: [f32; 2],     // Accumulated pan offset (x, y) in pixels for drag
 }
 
 struct MetalshaderApp {
@@ -31,16 +33,58 @@ struct MetalshaderApp {
     start_time: Instant,
     frame_count: u32,
     reload_requested: bool,
+    // Mouse and scroll state
+    mouse_x: f64,
+    mouse_y: f64,
+    mouse_click_x: f64,
+    mouse_click_y: f64,
+    mouse_left_pressed: bool,
+    scroll_x: f32,
+    scroll_y: f32,
+    pan_offset_x: f32,
+    pan_offset_y: f32,
 }
 
 impl MetalshaderApp {
+    fn resolve_shader_path(path: &str) -> String {
+        use std::path::Path;
+
+        // Remove trailing dot if present
+        let working_path = path.trim_end_matches('.').to_string();
+
+        // Check if file exists as-is
+        if Path::new(&working_path).exists() {
+            return working_path;
+        }
+
+        // Check if path has NO extension
+        let path_obj = Path::new(&working_path);
+        let has_extension = path_obj.extension().is_some();
+
+        if !has_extension {
+            // Try adding common fragment shader extensions
+            for ext in &[".frag", ".fsh", ".glsl"] {
+                let test_path = format!("{}{}", working_path, ext);
+                if Path::new(&test_path).exists() {
+                    println!("✓ Auto-detected extension: {}", test_path);
+                    return test_path;
+                }
+            }
+        }
+
+        working_path
+    }
+
     fn new(shader_path: &str) -> Self {
         let mut shader_manager = ShaderManager::new();
         let shader_compiler = ShaderCompiler::new();
 
+        // Resolve shader path with auto-detection
+        let resolved_path = Self::resolve_shader_path(shader_path);
+
         // First, try to compile the requested shader if it's a source file
-        if shader_path.ends_with(".frag") || shader_path.ends_with(".glsl") {
-            match shader_compiler.compile_if_needed(shader_path) {
+        if resolved_path.ends_with(".frag") || resolved_path.ends_with(".glsl") {
+            match shader_compiler.compile_if_needed(&resolved_path) {
                 Ok(_base_name) => {
                     println!("✓ Shader compiled successfully");
                 }
@@ -65,7 +109,7 @@ impl MetalshaderApp {
         }
 
         // Extract base name from shader path for shader manager lookup
-        let base_shader_path = std::path::Path::new(shader_path)
+        let base_shader_path = std::path::Path::new(&resolved_path)
             .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or(shader_path);
@@ -88,6 +132,15 @@ impl MetalshaderApp {
             start_time: Instant::now(),
             frame_count: 0,
             reload_requested: true,
+            mouse_x: 0.0,
+            mouse_y: 0.0,
+            mouse_click_x: 0.0,
+            mouse_click_y: 0.0,
+            mouse_left_pressed: false,
+            scroll_x: 0.0,
+            scroll_y: 0.0,
+            pan_offset_x: 0.0,
+            pan_offset_y: 0.0,
         }
     }
 
@@ -151,6 +204,21 @@ impl MetalshaderApp {
                     let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(3840, 2160));
                     println!("\n[4] Resolution: 3840x2160 (4K)");
                 }
+            }
+            PhysicalKey::Code(KeyCode::KeyR) => {
+                self.scroll_x = 0.0;
+                self.scroll_y = 0.0;
+                self.pan_offset_x = 0.0;
+                self.pan_offset_y = 0.0;
+                println!("\n[R] Reset zoom and pan");
+            }
+            PhysicalKey::Code(KeyCode::Equal) | PhysicalKey::Code(KeyCode::NumpadAdd) => {
+                self.scroll_y = (self.scroll_y + 1.0).min(100.0);
+                println!("\n[+] Zoom in: {:.1}", self.scroll_y);
+            }
+            PhysicalKey::Code(KeyCode::Minus) | PhysicalKey::Code(KeyCode::NumpadSubtract) => {
+                self.scroll_y = (self.scroll_y - 1.0).max(-100.0);
+                println!("\n[-] Zoom out: {:.1}", self.scroll_y);
             }
             _ => {}
         }
@@ -238,6 +306,8 @@ impl ApplicationHandler for MetalshaderApp {
                             i_resolution: [size.width as f32, size.height as f32, 1.0],
                             i_time: elapsed,
                             i_mouse: [0.0, 0.0, 0.0, 0.0],
+                            i_scroll: [self.scroll_x, self.scroll_y],
+                            i_pan: [self.pan_offset_x, self.pan_offset_y],
                         };
 
                         match renderer.render_frame(&ubo) {
@@ -278,6 +348,51 @@ impl ApplicationHandler for MetalshaderApp {
                 }
                 if let Some(window) = &self.window {
                     window.request_redraw();
+                }
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                self.mouse_x = position.x;
+                self.mouse_y = position.y;
+            }
+            WindowEvent::MouseInput { state, button, .. } => {
+                use winit::event::MouseButton;
+                if button == MouseButton::Left {
+                    match state {
+                        ElementState::Pressed => {
+                            self.mouse_left_pressed = true;
+                            self.mouse_click_x = self.mouse_x;
+                            self.mouse_click_y = self.mouse_y;
+                        }
+                        ElementState::Released => {
+                            if self.mouse_left_pressed {
+                                // Accumulate drag offset into pan offset
+                                let drag_delta_x = self.mouse_x - self.mouse_click_x;
+                                let drag_delta_y = self.mouse_y - self.mouse_click_y;
+                                self.pan_offset_x += drag_delta_x as f32;
+                                self.pan_offset_y += drag_delta_y as f32;
+                            }
+                            self.mouse_left_pressed = false;
+                        }
+                    }
+                }
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                use winit::event::MouseScrollDelta;
+                match delta {
+                    MouseScrollDelta::LineDelta(x, y) => {
+                        self.scroll_x += x;
+                        self.scroll_y += y;
+                        // Clamp to prevent extreme values
+                        self.scroll_x = self.scroll_x.clamp(-100.0, 100.0);
+                        self.scroll_y = self.scroll_y.clamp(-100.0, 100.0);
+                    }
+                    MouseScrollDelta::PixelDelta(pos) => {
+                        self.scroll_x += (pos.x / 10.0) as f32;
+                        self.scroll_y += (pos.y / 10.0) as f32;
+                        // Clamp to prevent extreme values
+                        self.scroll_x = self.scroll_x.clamp(-100.0, 100.0);
+                        self.scroll_y = self.scroll_y.clamp(-100.0, 100.0);
+                    }
                 }
             }
             _ => {}
