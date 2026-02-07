@@ -354,8 +354,11 @@ impl ApplicationHandler for MetalshaderApp {
                         };
 
                         // Convert base_pan (complex-plane units) to pan_offset (pixels) for shader
-                        // This makes pan scale correctly with zoom level
-                        let current_zoom = (self.scroll_y * 0.1).exp();
+                        // Match shader's zoom calculation: zoom = exp((iTime - iScroll.y) * ZOOM_SPEED)
+                        const ZOOM_SPEED: f32 = 0.15;
+                        let effective_time = elapsed - self.scroll_y;
+                        let current_zoom = (effective_time * ZOOM_SPEED).exp().clamp(0.01, 1e10);
+
                         self.pan_offset_x = -self.base_pan_x * size.width as f32 * current_zoom / 3.0;
                         self.pan_offset_y = -self.base_pan_y * size.height as f32 * current_zoom / 3.0;
 
@@ -438,13 +441,16 @@ impl ApplicationHandler for MetalshaderApp {
                                     let norm_drag_x = drag_delta_x as f32 / size.width as f32;
                                     let norm_drag_y = drag_delta_y as f32 / size.height as f32;
 
-                                    // Calculate current zoom
-                                    let current_zoom = (self.scroll_y * 0.1).exp();
+                                    // Calculate current zoom matching shader's formula
+                                    const ZOOM_SPEED: f32 = 0.15;
+                                    let elapsed = self.start_time.elapsed().as_secs_f32();
+                                    let effective_time = elapsed - self.scroll_y;
+                                    let current_zoom = (effective_time * ZOOM_SPEED).exp().clamp(0.01, 1e10);
                                     let aspect = size.width as f32 / size.height as f32;
 
-                                    // Exponential dampening: use zoom^1.5 for softer pan at high zoom
+                                    // Exponential dampening: use zoom^8.5 for softer pan at high zoom
                                     // This makes sensitivity drop off more aggressively than linear 1/zoom
-                                    let zoom_dampening = current_zoom.powf(1.5);
+                                    let zoom_dampening = current_zoom.powf(8.5);
 
                                     // Convert to complex-plane units (accounts for current zoom and aspect)
                                     self.base_pan_x += norm_drag_x * 3.0 / zoom_dampening / aspect;
