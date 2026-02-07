@@ -21,7 +21,6 @@ struct SharedState {
 }
 
 pub struct MacOSDisplay {
-    window: Arc<Window>,
     width: u32,
     height: u32,
     state: Arc<Mutex<SharedState>>,
@@ -29,15 +28,15 @@ pub struct MacOSDisplay {
 
 impl DisplayBackend for MacOSDisplay {
     fn new() -> Result<Self, Box<dyn Error>> {
-        // Note: We can't use EventLoop here because it must be created in main thread
-        // For now, create a headless implementation
-        // This will be enhanced in future to properly integrate with winit
+        // Note: Running in headless mode for now
+        // Full windowed support requires integrating winit's event loop into main.rs
+        // See /opt/3d/metalshade/metalshade.cpp for reference implementation with GLFW
 
         println!("macOS display initialized (headless mode)");
-        println!("Note: Full windowed support requires event loop integration");
+        println!("Note: Rendering without window - output is not displayed");
+        println!("To add windowed support, see metalshade.cpp for reference");
 
         Ok(Self {
-            window: Arc::new(unsafe { std::mem::zeroed() }), // Placeholder
             width: 1280,
             height: 800,
             state: Arc::new(Mutex::new(SharedState {

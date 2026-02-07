@@ -49,10 +49,17 @@ The binary will be at `target/release/metalshader`.
 cargo build --release
 ```
 
-**Note**: macOS builds use MoltenVK for Vulkan support. Make sure you have the Vulkan SDK installed:
+**Prerequisites**: Install Vulkan SDK or MoltenVK:
 ```bash
+# Option 1: Download Vulkan SDK from https://vulkan.lunarg.com/sdk/home
+# Option 2: Install via Homebrew
 brew install molten-vk
+export DYLD_LIBRARY_PATH="/opt/homebrew/lib:$DYLD_LIBRARY_PATH"
 ```
+
+See `notes/macos-setup.md` for detailed setup instructions.
+
+**Current Status**: Headless mode only (renders but doesn't display). Windowed support in development.
 
 The binary will be at `target/release/metalshader`.
 
