@@ -349,10 +349,14 @@ impl ApplicationHandler for MetalshaderApp {
 
                         // Interpolation factor: higher zoom = more smoothing
                         // At zoom=1: lerp=1.0 (instant), at high zoom: lerp→0 (very smooth)
-                        let lerp_factor = (1.0 / current_zoom.powf(0.3)).clamp(0.01, 1.0);
+                        // Using power 1.2 for aggressive smoothing: zoom=100 → lerp=0.004, zoom=1000 → lerp=0.0002
+                        let lerp_factor = (1.0 / current_zoom.powf(1.2)).clamp(0.0001, 1.0);
 
-                        self.mouse_smooth_x += (self.mouse_x - self.mouse_smooth_x) * lerp_factor as f64;
-                        self.mouse_smooth_y += (self.mouse_y - self.mouse_smooth_y) * lerp_factor as f64;
+                        // Also scale by delta_time for frame-rate independence
+                        let smooth_speed = lerp_factor * delta_time * 60.0; // Normalize to 60fps
+
+                        self.mouse_smooth_x += (self.mouse_x - self.mouse_smooth_x) * smooth_speed.min(1.0) as f64;
+                        self.mouse_smooth_y += (self.mouse_y - self.mouse_smooth_y) * smooth_speed.min(1.0) as f64;
 
                         // Scale mouse coordinates for Retina displays
                         let scale_x = size.width as f32 / window.inner_size().width as f32;
