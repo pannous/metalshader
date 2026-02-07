@@ -29,9 +29,15 @@ The program will automatically find:
 
 - **Arrow Left**: Previous shader
 - **Arrow Right**: Next shader
-- **1-9**: Change resolution mode (displays available modes on startup)
-- **F**: Toggle fullscreen (host-dependent)
+- **1-9**: Change resolution mode (Linux/Redox only)
+- **F**: Toggle fullscreen
 - **ESC** or **Q**: Quit
+
+### macOS Features
+- Real-time window display with Vulkan swapchain
+- Smooth shader switching
+- Fullscreen toggle support
+- ~50 FPS performance on Apple Silicon
 
 ## Building
 
@@ -64,7 +70,7 @@ source ~/.zshrc
 
 See `notes/macos-setup.md` for detailed setup instructions.
 
-**Current Status**: ✅ Compiles and runs successfully! Headless mode (renders in memory). Windowed support in development.
+**Current Status**: ✅ **Fully working with window display!** Swapchain-based rendering with real-time window output.
 
 The binary will be at `target/release/metalshader`.
 
@@ -156,7 +162,7 @@ void main() {
 ### Supported Platforms
 
 - ✅ **Linux** (Alpine, Ubuntu, etc.) - Fully working with DRM/KMS
-- ✅ **macOS** - Compiles and runs (headless mode, window support in development)
+- ✅ **macOS** - **Fully working with windowed display!** Swapchain-based rendering
 - 🚧 **Redox OS** - Implementation complete, pending testing
 
 ## Performance

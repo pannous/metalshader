@@ -1,18 +1,28 @@
 // Metalshader - Interactive shader viewer in Rust
 // Controls:
 //   Arrow Left/Right: Switch between shaders
-//   1-9: Change resolution mode
+//   1-9: Change resolution mode (Linux/Redox only)
 //   ESC/Q: Quit
 //   F: Toggle fullscreen
 
+#[cfg(any(target_os = "linux", target_os = "redox"))]
 use std::fs::File;
+#[cfg(any(target_os = "linux", target_os = "redox"))]
 use std::io::{Read, Write};
-use std::path::Path;
+#[cfg(any(target_os = "linux", target_os = "redox"))]
 use std::time::Instant;
 
-mod renderer;
 mod shader;
+
+#[cfg(not(target_os = "macos"))]
+mod renderer;
+#[cfg(not(target_os = "macos"))]
 mod platform;
+
+#[cfg(target_os = "macos")]
+mod main_macos;
+#[cfg(target_os = "macos")]
+mod renderer_swapchain;
 
 // Platform-conditional imports
 #[cfg(target_os = "linux")]
@@ -21,13 +31,16 @@ use platform::linux::{LinuxDisplay as Display, LinuxInput as Input};
 #[cfg(target_os = "redox")]
 use platform::redox::{RedoxDisplay as Display, RedoxInput as Input};
 
-#[cfg(target_os = "macos")]
-use platform::macos::{MacOSDisplay as Display, MacOSInput as Input};
-
+#[cfg(not(target_os = "macos"))]
 use platform::{DisplayBackend, InputBackend, KeyEvent};
+
+#[cfg(not(target_os = "macos"))]
 use renderer::VulkanRenderer;
+
+#[cfg(not(target_os = "macos"))]
 use shader::ShaderManager;
 
+#[cfg(any(target_os = "linux", target_os = "redox"))]
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct ShaderToyUBO {
@@ -36,7 +49,25 @@ struct ShaderToyUBO {
     i_mouse: [f32; 4],
 }
 
-#[cfg(any(target_os = "linux", target_os = "redox", target_os = "macos"))]
+#[cfg(target_os = "macos")]
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // macOS uses windowed swapchain-based renderer
+    let args: Vec<String> = std::env::args().collect();
+    let shader_name = if args.len() < 2 {
+        "example"
+    } else {
+        args[1].as_str()
+    };
+
+    let shader_name = std::path::Path::new(shader_name)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("example");
+
+    main_macos::run_macos(shader_name)
+}
+
+#[cfg(any(target_os = "linux", target_os = "redox"))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse command line arguments
     let args: Vec<String> = std::env::args().collect();
@@ -215,6 +246,7 @@ fn main() {
     eprintln!("Supported platforms: Linux, Redox, macOS");
 }
 
+#[cfg(any(target_os = "linux", target_os = "redox"))]
 fn send_fullscreen_command() -> Result<(), Box<dyn std::error::Error>> {
     // Find QEMU display control port
     for i in 0..10 {
