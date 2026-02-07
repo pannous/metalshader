@@ -1,6 +1,6 @@
 # C to Rust Porting Status
 
-Last synced with C version: 2026-02-07
+Last synced with C version: 2026-02-07 (commit 7d92317)
 
 ## ✅ Ported Features (from last 20 commits)
 
@@ -81,6 +81,14 @@ The Rust version now has **feature parity** with the C version for:
 - ✅ Keyboard controls (navigation, zoom, reset)
 - ✅ Shader compilation and hot-reloading
 - ✅ UBO data (resolution, time, mouse, scroll, pan)
+- ✅ **Zoom-aware mouse smoothing** (NEW: commit 7d92317)
+
+**Zoom-aware mouse smoothing:**
+- Implemented in both Rust and C versions (2026-02-07)
+- Exponential dampening: lerp_factor = 1 / zoom^1.2
+- Frame-rate independent smoothing
+- Eliminates cursor jitter at extreme zoom (100,000x+)
+- Maintains responsiveness at low zoom levels
 
 **Missing:**
 - ❌ Feedback rendering system (ping-pong buffers)
@@ -101,3 +109,17 @@ If feedback rendering is needed:
 3. Modify SwapchainRenderer to support feedback path
 4. Add descriptor set updates per frame
 5. Test with feedback shaders (organic_life, paint)
+
+## 📝 Recent Work (2026-02-07)
+
+### Zoom-aware Mouse Smoothing
+Created dual-precision shader system:
+- `mandelbrot_autozoom.frag` - f32 version (working up to ~77s, zoom ~100,000x)
+- `mandelbrot_autozoom_f64.frag` - f64 version (extends to 1e15+ zoom)
+
+Implemented smooth zoom-to-cursor behavior:
+- Mouse position smoothing with zoom-based dampening
+- Synchronizes C and Rust zoom calculations with shader
+- Formula: zoom = exp((time - scrollY) * 0.15)
+- Smooth factor: lerp = (1 / zoom^1.2) * deltaTime * 60 * 0.5
+- Both versions now have identical smooth behavior
