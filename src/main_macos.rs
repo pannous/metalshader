@@ -353,7 +353,8 @@ impl ApplicationHandler for MetalshaderApp {
                         let lerp_factor = (1.0 / current_zoom.powf(1.2)).clamp(0.0001, 1.0);
 
                         // Also scale by delta_time for frame-rate independence
-                        let smooth_speed = lerp_factor * delta_time * 60.0; // Normalize to 60fps
+                        // Multiply by 0.5 to make it 2x slower for more stable focal point
+                        let smooth_speed = lerp_factor * delta_time * 60.0 * 0.5; // Normalize to 60fps, then 2x slower
 
                         self.mouse_smooth_x += (self.mouse_x - self.mouse_smooth_x) * smooth_speed.min(1.0) as f64;
                         self.mouse_smooth_y += (self.mouse_y - self.mouse_smooth_y) * smooth_speed.min(1.0) as f64;
