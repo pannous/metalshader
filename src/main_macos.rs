@@ -11,6 +11,7 @@ use winit::window::{Window, WindowId};
 
 use crate::renderer_swapchain::SwapchainRenderer;
 use crate::shader::ShaderManager;
+use crate::shader_compiler::ShaderCompiler;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -24,6 +25,7 @@ struct MetalshaderApp {
     window: Option<Arc<Window>>,
     renderer: Option<SwapchainRenderer>,
     shader_manager: ShaderManager,
+    shader_compiler: ShaderCompiler,
     current_shader_idx: usize,
     start_time: Instant,
     frame_count: u32,
@@ -33,6 +35,22 @@ struct MetalshaderApp {
 impl MetalshaderApp {
     fn new(shader_name: &str) -> Self {
         let mut shader_manager = ShaderManager::new();
+        let shader_compiler = ShaderCompiler::new();
+
+        // First, try to compile the requested shader if it's a source file
+        if shader_name.ends_with(".frag") || shader_name.ends_with(".glsl") {
+            match shader_compiler.compile_if_needed(shader_name) {
+                Ok(base_name) => {
+                    println!("✓ Shader compiled successfully");
+                    // Update shader_name to use the base name
+                    // (We'll scan and find it below)
+                }
+                Err(e) => {
+                    eprintln!("Warning: Failed to compile shader: {}", e);
+                    eprintln!("Make sure glslangValidator is installed: brew install glslang");
+                }
+            }
+        }
 
         // Scan for shaders
         if let Err(e) = shader_manager.scan_shaders(&[".", "./shaders", "/root/metalshade/shaders"]) {
@@ -42,12 +60,19 @@ impl MetalshaderApp {
         if shader_manager.is_empty() {
             eprintln!("No compiled shaders found.");
             eprintln!("Searched: . ./shaders /root/metalshade/shaders");
+            eprintln!("Compile shaders with: glslangValidator -V <shader>.vert -o <shader>.vert.spv");
         } else {
             shader_manager.print_available();
         }
 
+        // Extract base name from shader path
+        let base_shader_name = std::path::Path::new(shader_name)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or(shader_name);
+
         let current_shader_idx = shader_manager
-            .find_by_name(shader_name)
+            .find_by_name(base_shader_name)
             .unwrap_or(0);
 
         println!("Starting with shader: {}",
@@ -59,6 +84,7 @@ impl MetalshaderApp {
             window: None,
             renderer: None,
             shader_manager,
+            shader_compiler,
             current_shader_idx,
             start_time: Instant::now(),
             frame_count: 0,

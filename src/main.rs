@@ -13,6 +13,7 @@ use std::io::{Read, Write};
 use std::time::Instant;
 
 mod shader;
+mod shader_compiler;
 
 #[cfg(not(target_os = "macos"))]
 mod renderer;
