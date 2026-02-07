@@ -11,9 +11,16 @@ libc = "0.2"
 drm = "0.14"  # new - modern DRM API with DumbBuffer support
 input-linux = "0.7"  # Latest available on crates.io
 
-[target.'cfg(target_os = "redox")'.dependencies]
-orbclient = "0.3.47"  # For Event types and input handling
-syscall = "0.4"       # For Redox syscalls (fcntl, etc.)
+# Note: Redox dependencies are not available on crates.io
+# They are only available when building within the Redox ecosystem
+# [target.'cfg(target_os = "redox")'.dependencies]
+# orbclient = "0.3.47"  # For Event types and input handling
+# syscall = "0.4"       # For Redox syscalls (fcntl, etc.)
+
+[target.'cfg(target_os = "macos")'.dependencies]
+winit = "0.30"        # Cross-platform windowing and input
+raw-window-handle = "0.6"  # For Vulkan surface creation
+ash-window = "0.13"   # Helper for creating Vulkan surfaces from windows
 
 [profile.release]
 opt-level = 3

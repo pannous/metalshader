@@ -21,6 +21,9 @@ use platform::linux::{LinuxDisplay as Display, LinuxInput as Input};
 #[cfg(target_os = "redox")]
 use platform::redox::{RedoxDisplay as Display, RedoxInput as Input};
 
+#[cfg(target_os = "macos")]
+use platform::macos::{MacOSDisplay as Display, MacOSInput as Input};
+
 use platform::{DisplayBackend, InputBackend, KeyEvent};
 use renderer::VulkanRenderer;
 use shader::ShaderManager;
@@ -33,7 +36,7 @@ struct ShaderToyUBO {
     i_mouse: [f32; 4],
 }
 
-#[cfg(any(target_os = "linux", target_os = "redox"))]
+#[cfg(any(target_os = "linux", target_os = "redox", target_os = "macos"))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse command line arguments
     let args: Vec<String> = std::env::args().collect();
@@ -206,10 +209,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[cfg(not(any(target_os = "linux", target_os = "redox")))]
+#[cfg(not(any(target_os = "linux", target_os = "redox", target_os = "macos")))]
 fn main() {
     eprintln!("This platform is not supported.");
-    eprintln!("Supported platforms: Linux, Redox");
+    eprintln!("Supported platforms: Linux, Redox, macOS");
 }
 
 fn send_fullscreen_command() -> Result<(), Box<dyn std::error::Error>> {

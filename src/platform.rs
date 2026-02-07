@@ -79,3 +79,6 @@ pub mod linux;
 
 #[cfg(target_os = "redox")]
 pub mod redox;
+
+#[cfg(target_os = "macos")]
+pub mod macos;
