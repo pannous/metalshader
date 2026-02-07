@@ -343,14 +343,25 @@ impl ApplicationHandler for MetalshaderApp {
 
                         // Smooth mouse movement to prevent jitter at high zoom
                         // Calculate current zoom to determine smoothing factor
-                        const ZOOM_SPEED: f32 = 0.15;
-                        let effective_time = elapsed - self.scroll_y;
-                        let current_zoom = (effective_time * ZOOM_SPEED).exp().clamp(0.01, 1e10);
+                        // Different formulas for auto-zoom vs manual zoom shaders
+                        let is_autozoom = self.shader_manager.get(self.current_shader_idx)
+                            .map(|s| s.name.contains("autozoom"))
+                            .unwrap_or(false);
+                        let current_zoom = if is_autozoom {
+                            // Auto-zoom mode: zoom = exp((time - scroll_y) * ZOOM_SPEED)
+                            const ZOOM_SPEED: f32 = 0.15;
+                            let effective_time = elapsed - self.scroll_y;
+                            (effective_time * ZOOM_SPEED).exp().clamp(0.01, 1e10)
+                        } else {
+                            // Manual zoom mode: zoom = sqrt(exp(scroll_y * 0.1))
+                            // Matches mandelbrot_simple.frag and other manual shaders
+                            (self.scroll_y * 0.1).exp().sqrt().clamp(0.01, 1e10)
+                        };
 
                         // Interpolation factor: higher zoom = more smoothing
                         // At zoom=1: lerp=1.0 (instant), at high zoom: lerp→0 (very smooth)
                         // Using power 1.2 for aggressive smoothing: zoom=100 → lerp=0.004, zoom=1000 → lerp=0.0002
-                        let lerp_factor = (1.0 / current_zoom.powf(1.2)).clamp(0.0001, 1.0);
+                        let lerp_factor = (1.0_f32 / current_zoom.powf(1.2)).clamp(0.0001, 1.0);
 
                         // Also scale by delta_time for frame-rate independence
                         // Multiply by 0.5 to make it 2x slower for more stable focal point
