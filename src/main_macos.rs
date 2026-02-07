@@ -20,6 +20,11 @@ struct ShaderToyUBO {
     i_time: f32,
     i_mouse: [f32; 4],
     i_scroll: [f32; 2],  // Accumulated scroll offset (x, y) for zoom
+    i_button_left: f32,   // Button press duration in seconds
+    i_button_right: f32,
+    i_button_middle: f32,
+    i_button_4: f32,
+    i_button_5: f32,
     i_pan: [f32; 2],     // Accumulated pan offset (x, y) in pixels for drag
 }
 
@@ -39,10 +44,14 @@ struct MetalshaderApp {
     mouse_click_x: f64,
     mouse_click_y: f64,
     mouse_left_pressed: bool,
+    mouse_right_pressed: bool,
+    mouse_middle_pressed: bool,
+    button_press_duration: [f32; 5],  // Duration in seconds for each button
     scroll_x: f32,
     scroll_y: f32,
     pan_offset_x: f32,
     pan_offset_y: f32,
+    last_frame_time: Instant,
 }
 
 impl MetalshaderApp {
@@ -137,10 +146,14 @@ impl MetalshaderApp {
             mouse_click_x: 0.0,
             mouse_click_y: 0.0,
             mouse_left_pressed: false,
+            mouse_right_pressed: false,
+            mouse_middle_pressed: false,
+            button_press_duration: [0.0; 5],
             scroll_x: 0.0,
             scroll_y: 0.0,
             pan_offset_x: 0.0,
             pan_offset_y: 0.0,
+            last_frame_time: Instant::now(),
         }
     }
 
@@ -213,11 +226,11 @@ impl MetalshaderApp {
                 println!("\n[R] Reset zoom and pan");
             }
             PhysicalKey::Code(KeyCode::Equal) | PhysicalKey::Code(KeyCode::NumpadAdd) => {
-                self.scroll_y = (self.scroll_y + 1.0).min(100.0);
+                self.scroll_y += 1.0;
                 println!("\n[+] Zoom in: {:.1}", self.scroll_y);
             }
             PhysicalKey::Code(KeyCode::Minus) | PhysicalKey::Code(KeyCode::NumpadSubtract) => {
-                self.scroll_y = (self.scroll_y - 1.0).max(-100.0);
+                self.scroll_y -= 1.0;
                 println!("\n[-] Zoom out: {:.1}", self.scroll_y);
             }
             _ => {}
@@ -302,11 +315,48 @@ impl ApplicationHandler for MetalshaderApp {
                         let size = window.inner_size();
                         let elapsed = self.start_time.elapsed().as_secs_f32();
 
+                        // Update button press durations
+                        let now = Instant::now();
+                        let delta_time = now.duration_since(self.last_frame_time).as_secs_f32();
+                        self.last_frame_time = now;
+
+                        if self.mouse_left_pressed {
+                            self.button_press_duration[0] += delta_time;
+                        }
+                        if self.mouse_right_pressed {
+                            self.button_press_duration[1] += delta_time;
+                        }
+                        if self.mouse_middle_pressed {
+                            self.button_press_duration[2] += delta_time;
+                        }
+
+                        // Scale mouse coordinates for Retina displays
+                        let scale_x = size.width as f32 / window.inner_size().width as f32;
+                        let scale_y = size.height as f32 / window.inner_size().height as f32;
+
+                        let scaled_mouse_x = self.mouse_x as f32 * scale_x;
+                        let scaled_mouse_y = self.mouse_y as f32 * scale_y;
+                        let scaled_click_x = self.mouse_click_x as f32 * scale_x;
+                        let scaled_click_y = self.mouse_click_y as f32 * scale_y;
+
+                        // ShaderToy mouse convention:
+                        // xy = current position, zw = click position (negative if button up)
+                        let i_mouse = if self.mouse_left_pressed {
+                            [scaled_mouse_x, scaled_mouse_y, scaled_click_x, scaled_click_y]
+                        } else {
+                            [scaled_mouse_x, scaled_mouse_y, -scaled_click_x, -scaled_click_y]
+                        };
+
                         let ubo = ShaderToyUBO {
                             i_resolution: [size.width as f32, size.height as f32, 1.0],
                             i_time: elapsed,
-                            i_mouse: [0.0, 0.0, 0.0, 0.0],
+                            i_mouse,
                             i_scroll: [self.scroll_x, self.scroll_y],
+                            i_button_left: self.button_press_duration[0],
+                            i_button_right: self.button_press_duration[1],
+                            i_button_middle: self.button_press_duration[2],
+                            i_button_4: self.button_press_duration[3],
+                            i_button_5: self.button_press_duration[4],
                             i_pan: [self.pan_offset_x, self.pan_offset_y],
                         };
 
@@ -356,14 +406,16 @@ impl ApplicationHandler for MetalshaderApp {
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 use winit::event::MouseButton;
-                if button == MouseButton::Left {
-                    match state {
-                        ElementState::Pressed => {
+                let pressed = state == ElementState::Pressed;
+
+                match button {
+                    MouseButton::Left => {
+                        if pressed {
                             self.mouse_left_pressed = true;
                             self.mouse_click_x = self.mouse_x;
                             self.mouse_click_y = self.mouse_y;
-                        }
-                        ElementState::Released => {
+                            self.button_press_duration[0] = 0.0;
+                        } else {
                             if self.mouse_left_pressed {
                                 // Accumulate drag offset into pan offset
                                 let drag_delta_x = self.mouse_x - self.mouse_click_x;
@@ -374,6 +426,29 @@ impl ApplicationHandler for MetalshaderApp {
                             self.mouse_left_pressed = false;
                         }
                     }
+                    MouseButton::Right => {
+                        self.mouse_right_pressed = pressed;
+                        if pressed {
+                            self.button_press_duration[1] = 0.0;
+                        }
+                    }
+                    MouseButton::Middle => {
+                        self.mouse_middle_pressed = pressed;
+                        if pressed {
+                            self.button_press_duration[2] = 0.0;
+                        }
+                    }
+                    MouseButton::Back => {
+                        if pressed {
+                            self.button_press_duration[3] = 0.0;
+                        }
+                    }
+                    MouseButton::Forward => {
+                        if pressed {
+                            self.button_press_duration[4] = 0.0;
+                        }
+                    }
+                    _ => {}
                 }
             }
             WindowEvent::MouseWheel { delta, .. } => {
@@ -382,16 +457,10 @@ impl ApplicationHandler for MetalshaderApp {
                     MouseScrollDelta::LineDelta(x, y) => {
                         self.scroll_x += x;
                         self.scroll_y += y;
-                        // Clamp to prevent extreme values
-                        self.scroll_x = self.scroll_x.clamp(-100.0, 100.0);
-                        self.scroll_y = self.scroll_y.clamp(-100.0, 100.0);
                     }
                     MouseScrollDelta::PixelDelta(pos) => {
                         self.scroll_x += (pos.x / 10.0) as f32;
                         self.scroll_y += (pos.y / 10.0) as f32;
-                        // Clamp to prevent extreme values
-                        self.scroll_x = self.scroll_x.clamp(-100.0, 100.0);
-                        self.scroll_y = self.scroll_y.clamp(-100.0, 100.0);
                     }
                 }
             }
