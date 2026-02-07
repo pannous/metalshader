@@ -7,6 +7,12 @@ edition = "2021"
 ash = "0.38"
 libc = "0.2"
 
+                                                                                                     
+# .cargo/config.toml
+# Offline mode configuration                                                                                       
+# [net]                                                                                                              
+# offline = true    
+
 [target.'cfg(target_os = "linux")'.dependencies]
 drm = "0.14"  # new - modern DRM API with DumbBuffer support
 input-linux = "0.7"  # Latest available on crates.io

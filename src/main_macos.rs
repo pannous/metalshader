@@ -41,6 +41,8 @@ struct MetalshaderApp {
     // Mouse and scroll state
     mouse_x: f64,
     mouse_y: f64,
+    mouse_smooth_x: f64,  // Smoothed mouse position for zoom focal point
+    mouse_smooth_y: f64,
     mouse_click_x: f64,
     mouse_click_y: f64,
     mouse_left_pressed: bool,
@@ -145,6 +147,8 @@ impl MetalshaderApp {
             reload_requested: true,
             mouse_x: 0.0,
             mouse_y: 0.0,
+            mouse_smooth_x: 0.0,
+            mouse_smooth_y: 0.0,
             mouse_click_x: 0.0,
             mouse_click_y: 0.0,
             mouse_left_pressed: false,
@@ -337,12 +341,26 @@ impl ApplicationHandler for MetalshaderApp {
                             self.button_press_duration[2] += delta_time;
                         }
 
+                        // Smooth mouse movement to prevent jitter at high zoom
+                        // Calculate current zoom to determine smoothing factor
+                        const ZOOM_SPEED: f32 = 0.15;
+                        let effective_time = elapsed - self.scroll_y;
+                        let current_zoom = (effective_time * ZOOM_SPEED).exp().clamp(0.01, 1e10);
+
+                        // Interpolation factor: higher zoom = more smoothing
+                        // At zoom=1: lerp=1.0 (instant), at high zoom: lerp→0 (very smooth)
+                        let lerp_factor = (1.0 / current_zoom.powf(0.3)).clamp(0.01, 1.0);
+
+                        self.mouse_smooth_x += (self.mouse_x - self.mouse_smooth_x) * lerp_factor as f64;
+                        self.mouse_smooth_y += (self.mouse_y - self.mouse_smooth_y) * lerp_factor as f64;
+
                         // Scale mouse coordinates for Retina displays
                         let scale_x = size.width as f32 / window.inner_size().width as f32;
                         let scale_y = size.height as f32 / window.inner_size().height as f32;
 
-                        let scaled_mouse_x = self.mouse_x as f32 * scale_x;
-                        let scaled_mouse_y = self.mouse_y as f32 * scale_y;
+                        // Use smoothed mouse position for shader
+                        let scaled_mouse_x = self.mouse_smooth_x as f32 * scale_x;
+                        let scaled_mouse_y = self.mouse_smooth_y as f32 * scale_y;
                         let scaled_click_x = self.mouse_click_x as f32 * scale_x;
                         let scaled_click_y = self.mouse_click_y as f32 * scale_y;
 
@@ -426,24 +444,7 @@ impl ApplicationHandler for MetalshaderApp {
                             self.mouse_click_y = self.mouse_y;
                             self.button_press_duration[0] = 0.0;
                         } else {
-                            if self.mouse_left_pressed {
-                                if let Some(_window) = &self.window {
-                                    let drag_delta_x = self.mouse_x - self.mouse_click_x;
-                                    let drag_delta_y = self.mouse_y - self.mouse_click_y;
-
-                                    // Calculate current zoom matching shader's formula
-                                    const ZOOM_SPEED: f32 = 0.15;
-                                    let elapsed = self.start_time.elapsed().as_secs_f32();
-                                    let effective_time = elapsed - self.scroll_y;
-                                    let current_zoom = (effective_time * ZOOM_SPEED).exp().clamp(0.01, 1e10);
-
-                                    // Just accumulate pixel offsets - shader handles complex-plane conversion
-                                    // Apply dampening for smooth panning at high zoom
-                                    let zoom_dampening = current_zoom.powf(8.5);
-                                    self.pan_offset_x += drag_delta_x as f32 * zoom_dampening;
-                                    self.pan_offset_y += drag_delta_y as f32 * zoom_dampening;
-                                }
-                            }
+                            // Mouse released - no drag handling needed (zoom follows cursor directly)
                             self.mouse_left_pressed = false;
                             self.button_press_duration[0] = 0.0;
                         }
