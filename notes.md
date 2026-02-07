@@ -1,3 +1,52 @@
+## 2026-02-07: macOS Compilation Support Added ✓
+
+Successfully added macOS compilation support to metalshader!
+
+### Changes Made:
+1. **Created macOS platform implementation** (`src/platform/macos.rs`)
+   - Uses winit for cross-platform compatibility
+   - Implements DisplayBackend and InputBackend traits
+   - Headless mode (no window display yet)
+
+2. **Updated build configuration** (`Cargo.toml`)
+   - Added macOS-specific dependencies (winit, ash-window, raw-window-handle)
+   - Commented out Redox dependencies (not available on crates.io)
+
+3. **Updated platform abstraction** (`src/platform.rs`, `src/main.rs`)
+   - Added macOS to supported platforms
+   - Conditional compilation working correctly
+
+4. **Documentation**
+   - Created comprehensive macOS setup guide (`notes/macos-setup.md`)
+   - Updated README with build instructions and MoltenVK requirements
+   - Documented current limitations and future roadmap
+
+### Build Status:
+- ✅ **Compiles successfully** on macOS (both Apple Silicon and Intel)
+- ✅ **Binary created** at `target/release/metalshader`
+- ✅ **Runs** in headless mode (requires Vulkan SDK/MoltenVK)
+- ⏳ **Windowed mode** - not yet implemented (would require refactoring)
+
+### Current Architecture:
+- Uses LINEAR tiling + HOST_VISIBLE memory (Linux/Redox approach)
+- Compatible with existing renderer infrastructure
+- Simple polling-based input (no events yet)
+
+### To Fully Adopt C++ Logic (metalshade.cpp):
+Would require:
+1. Refactor main.rs to use winit's event loop as primary driver
+2. Create swapchain-based renderer for macOS (instead of LINEAR images)
+3. Add Vulkan surface creation from window
+4. Implement mouse input (5 buttons, drag-to-pan, scroll-to-zoom)
+5. Add feedback buffers for persistent effects
+6. Integrate shader hot-compilation (convert.py)
+
+This would be a **significant refactoring** (500+ lines of changes).
+
+### References:
+- C++ implementation: `/opt/3d/metalshade/metalshade.cpp` (2098 lines)
+- macOS setup guide: `notes/macos-setup.md`
+- Platform abstraction: `src/platform/*.rs`
 
 ## 2026-01-30: Alpine API Compatibility Breakthrough 🎉
 
