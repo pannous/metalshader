@@ -6,3 +6,7 @@ linker = "aarch64-unknown-redox-gcc"
 # Optional: Set default target for convenience
 # [build]
 # target = "aarch64-unknown-redox"
+
+# Offline mode configuration
+[net]
+offline = true

@@ -440,8 +440,8 @@ impl ApplicationHandler for MetalshaderApp {
                                     // Just accumulate pixel offsets - shader handles complex-plane conversion
                                     // Apply dampening for smooth panning at high zoom
                                     let zoom_dampening = current_zoom.powf(8.5);
-                                    self.pan_offset_x += drag_delta_x as f32 / zoom_dampening;
-                                    self.pan_offset_y += drag_delta_y as f32 / zoom_dampening;
+                                    self.pan_offset_x += drag_delta_x as f32 * zoom_dampening;
+                                    self.pan_offset_y += drag_delta_y as f32 * zoom_dampening;
                                 }
                             }
                             self.mouse_left_pressed = false;
