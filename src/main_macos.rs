@@ -128,6 +128,30 @@ impl MetalshaderApp {
                     }
                 }
             }
+            PhysicalKey::Code(KeyCode::Digit1) => {
+                if let Some(window) = &self.window {
+                    let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(800, 600));
+                    println!("\n[1] Resolution: 800x600");
+                }
+            }
+            PhysicalKey::Code(KeyCode::Digit2) => {
+                if let Some(window) = &self.window {
+                    let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(1280, 800));
+                    println!("\n[2] Resolution: 1280x800");
+                }
+            }
+            PhysicalKey::Code(KeyCode::Digit3) => {
+                if let Some(window) = &self.window {
+                    let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(1920, 1080));
+                    println!("\n[3] Resolution: 1920x1080 (Full HD)");
+                }
+            }
+            PhysicalKey::Code(KeyCode::Digit4) => {
+                if let Some(window) = &self.window {
+                    let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(3840, 2160));
+                    println!("\n[4] Resolution: 3840x2160 (4K)");
+                }
+            }
             _ => {}
         }
     }
@@ -184,18 +208,22 @@ impl ApplicationHandler for MetalshaderApp {
                 // Handle shader reload
                 if self.reload_requested {
                     if let Some(renderer) = &mut self.renderer {
-                        let shader_info = self.shader_manager.get(self.current_shader_idx).unwrap();
-                        match renderer.load_shader(
-                            shader_info.vert_path.to_str().unwrap(),
-                            shader_info.frag_path.to_str().unwrap()
-                        ) {
-                            Ok(_) => {
-                                println!("Loaded shader: {}", shader_info.name);
-                                self.reload_requested = false;
+                        if let Some(shader_info) = self.shader_manager.get(self.current_shader_idx) {
+                            match renderer.load_shader(
+                                shader_info.vert_path.to_str().unwrap(),
+                                shader_info.frag_path.to_str().unwrap()
+                            ) {
+                                Ok(_) => {
+                                    println!("Loaded shader: {}", shader_info.name);
+                                    self.reload_requested = false;
+                                }
+                                Err(e) => {
+                                    eprintln!("Failed to load shader '{}': {}", shader_info.name, e);
+                                }
                             }
-                            Err(e) => {
-                                eprintln!("Failed to load shader '{}': {}", shader_info.name, e);
-                            }
+                        } else {
+                            eprintln!("No shaders available to load");
+                            self.reload_requested = false;
                         }
                     }
                 }
