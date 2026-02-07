@@ -424,29 +424,22 @@ impl ApplicationHandler for MetalshaderApp {
                                 self.pan_offset_y += drag_delta_y as f32;
                             }
                             self.mouse_left_pressed = false;
+                            self.button_press_duration[0] = 0.0;
                         }
                     }
                     MouseButton::Right => {
                         self.mouse_right_pressed = pressed;
-                        if pressed {
-                            self.button_press_duration[1] = 0.0;
-                        }
+                        self.button_press_duration[1] = 0.0;
                     }
                     MouseButton::Middle => {
                         self.mouse_middle_pressed = pressed;
-                        if pressed {
-                            self.button_press_duration[2] = 0.0;
-                        }
+                        self.button_press_duration[2] = 0.0;
                     }
                     MouseButton::Back => {
-                        if pressed {
-                            self.button_press_duration[3] = 0.0;
-                        }
+                        self.button_press_duration[3] = 0.0;
                     }
                     MouseButton::Forward => {
-                        if pressed {
-                            self.button_press_duration[4] = 0.0;
-                        }
+                        self.button_press_duration[4] = 0.0;
                     }
                     _ => {}
                 }
