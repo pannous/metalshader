@@ -43,6 +43,19 @@ cargo build --release
 
 The binary will be at `target/release/metalshader`.
 
+### For macOS
+
+```bash
+cargo build --release
+```
+
+**Note**: macOS builds use MoltenVK for Vulkan support. Make sure you have the Vulkan SDK installed:
+```bash
+brew install molten-vk
+```
+
+The binary will be at `target/release/metalshader`.
+
 ### For Redox OS
 
 ```bash
@@ -130,7 +143,8 @@ void main() {
 
 ### Supported Platforms
 
-- ✅ **Linux** (Alpine, Ubuntu, etc.) - Fully working
+- ✅ **Linux** (Alpine, Ubuntu, etc.) - Fully working with DRM/KMS
+- ✅ **macOS** - Compiles and runs (headless mode, window support in development)
 - 🚧 **Redox OS** - Implementation complete, pending testing
 
 ## Performance
