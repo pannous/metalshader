@@ -25,6 +25,7 @@ struct MetalshaderApp {
     window: Option<Arc<Window>>,
     renderer: Option<SwapchainRenderer>,
     shader_manager: ShaderManager,
+    #[allow(dead_code)]
     shader_compiler: ShaderCompiler,
     current_shader_idx: usize,
     start_time: Instant,
@@ -33,17 +34,15 @@ struct MetalshaderApp {
 }
 
 impl MetalshaderApp {
-    fn new(shader_name: &str) -> Self {
+    fn new(shader_path: &str) -> Self {
         let mut shader_manager = ShaderManager::new();
         let shader_compiler = ShaderCompiler::new();
 
         // First, try to compile the requested shader if it's a source file
-        if shader_name.ends_with(".frag") || shader_name.ends_with(".glsl") {
-            match shader_compiler.compile_if_needed(shader_name) {
-                Ok(base_name) => {
+        if shader_path.ends_with(".frag") || shader_path.ends_with(".glsl") {
+            match shader_compiler.compile_if_needed(shader_path) {
+                Ok(_base_name) => {
                     println!("✓ Shader compiled successfully");
-                    // Update shader_name to use the base name
-                    // (We'll scan and find it below)
                 }
                 Err(e) => {
                     eprintln!("Warning: Failed to compile shader: {}", e);
@@ -65,14 +64,14 @@ impl MetalshaderApp {
             shader_manager.print_available();
         }
 
-        // Extract base name from shader path
-        let base_shader_name = std::path::Path::new(shader_name)
+        // Extract base name from shader path for shader manager lookup
+        let base_shader_path = std::path::Path::new(shader_path)
             .file_stem()
             .and_then(|s| s.to_str())
-            .unwrap_or(shader_name);
+            .unwrap_or(shader_path);
 
         let current_shader_idx = shader_manager
-            .find_by_name(base_shader_name)
+            .find_by_name(base_shader_path)
             .unwrap_or(0);
 
         println!("Starting with shader: {}",
@@ -253,11 +252,11 @@ impl ApplicationHandler for MetalshaderApp {
     }
 }
 
-pub fn run_macos(shader_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run_macos(shader_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
 
-    let mut app = MetalshaderApp::new(shader_name);
+    let mut app = MetalshaderApp::new(shader_path);
 
     event_loop.run_app(&mut app)?;
 

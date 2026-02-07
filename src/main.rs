@@ -54,18 +54,14 @@ struct ShaderToyUBO {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // macOS uses windowed swapchain-based renderer
     let args: Vec<String> = std::env::args().collect();
-    let shader_name = if args.len() < 2 {
+    let shader_path = if args.len() < 2 {
         "example"
     } else {
         args[1].as_str()
     };
 
-    let shader_name = std::path::Path::new(shader_name)
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("example");
-
-    main_macos::run_macos(shader_name)
+    // Pass the full path to run_macos (preserving directory)
+    main_macos::run_macos(shader_path)
 }
 
 #[cfg(any(target_os = "linux", target_os = "redox"))]

@@ -4,6 +4,7 @@ use std::process::Command;
 use std::fs;
 
 pub struct ShaderCompiler {
+    #[allow(dead_code)]
     shader_dir: PathBuf,
 }
 
@@ -18,6 +19,11 @@ impl ShaderCompiler {
     /// Returns the path to the compiled SPIR-V files (base name)
     pub fn compile_if_needed(&self, input_path: &str) -> Result<String, Box<dyn std::error::Error>> {
         let input = Path::new(input_path);
+
+        // Check if file exists
+        if !input.exists() {
+            return Err(format!("Shader file not found: {}", input_path).into());
+        }
 
         // Determine the base name and directory
         let base_name = input
@@ -35,7 +41,7 @@ impl ShaderCompiler {
         let frag_spv = shader_dir.join(format!("{}.frag.spv", base_name));
 
         if vert_spv.exists() && frag_spv.exists() {
-            // Already compiled
+            println!("✓ Using existing SPIR-V: {}", frag_spv.display());
             return Ok(base_name);
         }
 
@@ -44,7 +50,7 @@ impl ShaderCompiler {
             match ext {
                 "frag" | "glsl" | "fsh" => {
                     // Fragment shader source
-                    println!("Compiling shader: {}", input_path);
+                    println!("Compiling shader: {} -> {}", input_path, frag_spv.display());
                     self.compile_glsl_to_spirv(input, &base_name, shader_dir)?;
                     return Ok(base_name);
                 }
@@ -165,15 +171,25 @@ void main() {
         output: &Path,
         stage: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let status = Command::new("glslangValidator")
+        // Check if glslangValidator exists
+        let check = Command::new("which")
+            .arg("glslangValidator")
+            .output()?;
+
+        if !check.status.success() {
+            return Err("glslangValidator not found. Install with: brew install glslang".into());
+        }
+
+        let output_result = Command::new("glslangValidator")
             .arg("-V")
             .arg(input)
             .arg("-o")
             .arg(output)
-            .arg("--quiet")
-            .status()?;
+            .output()?;
 
-        if !status.success() {
+        if !output_result.status.success() {
+            let stderr = String::from_utf8_lossy(&output_result.stderr);
+            eprintln!("Compilation error:\n{}", stderr);
             return Err(format!("Failed to compile {} shader", stage).into());
         }
 
