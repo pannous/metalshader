@@ -1,7 +1,7 @@
 // Metalshader - Interactive shader viewer in Rust
 // Controls:
 //   Arrow Left/Right: Switch between shaders
-//   1: 800x600, 2: 1280x800, 3: 1920x1080, 4: 3840x2160 (macOS)
+//   1: 1024px, 2: 1280px, 3: 1920px, 4: 2560px, 5: native (macOS)
 //   1-9: Change resolution mode (Linux/Redox)
 //   ESC/Q: Quit
 //   F: Toggle fullscreen

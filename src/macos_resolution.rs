@@ -96,9 +96,9 @@ impl ResolutionManager {
             .unwrap_or(16.0 / 9.0);
 
         if key <= 5 {
-            // Keys 1-4: fixed widths (find closest 16:9 mode to each target)
+            // Keys 1-5: fixed widths (find closest 16:9 mode to each target)
             let native_w = self.modes.last().map(|m| m.width).unwrap_or(3840);
-            let targets = [1024usize, 1280, 1920, native_w];
+            let targets = [1024usize, 1280, 1920, 2560, native_w];
             let target_w = targets[(key - 1) as usize];
 
             // Find the 16:9 mode with width closest to target
