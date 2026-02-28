@@ -526,23 +526,14 @@ impl SwapchainRenderer {
             let input_assembly = vk::PipelineInputAssemblyStateCreateInfo::default()
                 .topology(vk::PrimitiveTopology::TRIANGLE_LIST);
 
-            let viewport = vk::Viewport {
-                x: 0.0,
-                y: 0.0,
-                width: self.swapchain_extent.width as f32,
-                height: self.swapchain_extent.height as f32,
-                min_depth: 0.0,
-                max_depth: 1.0,
-            };
-
-            let scissor = vk::Rect2D {
-                offset: vk::Offset2D { x: 0, y: 0 },
-                extent: self.swapchain_extent,
-            };
+            // Use dynamic viewport/scissor so resize doesn't require pipeline recreation
+            let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
+            let dynamic_state = vk::PipelineDynamicStateCreateInfo::default()
+                .dynamic_states(&dynamic_states);
 
             let viewport_state = vk::PipelineViewportStateCreateInfo::default()
-                .viewports(std::slice::from_ref(&viewport))
-                .scissors(std::slice::from_ref(&scissor));
+                .viewport_count(1)
+                .scissor_count(1);
 
             let rasterizer = vk::PipelineRasterizationStateCreateInfo::default()
                 .polygon_mode(vk::PolygonMode::FILL)
@@ -568,6 +559,7 @@ impl SwapchainRenderer {
                 .rasterization_state(&rasterizer)
                 .multisample_state(&multisampling)
                 .color_blend_state(&color_blending)
+                .dynamic_state(&dynamic_state)
                 .layout(self.pipeline_layout)
                 .render_pass(self.render_pass)
                 .subpass(0);
@@ -730,6 +722,22 @@ impl SwapchainRenderer {
                     vk::PipelineBindPoint::GRAPHICS,
                     pipeline,
                 );
+
+                // Set dynamic viewport and scissor to match current swapchain extent
+                let viewport = vk::Viewport {
+                    x: 0.0,
+                    y: 0.0,
+                    width: self.swapchain_extent.width as f32,
+                    height: self.swapchain_extent.height as f32,
+                    min_depth: 0.0,
+                    max_depth: 1.0,
+                };
+                let scissor = vk::Rect2D {
+                    offset: vk::Offset2D { x: 0, y: 0 },
+                    extent: self.swapchain_extent,
+                };
+                self.device.cmd_set_viewport(cmd_buf, 0, &[viewport]);
+                self.device.cmd_set_scissor(cmd_buf, 0, &[scissor]);
 
                 self.device.cmd_bind_descriptor_sets(
                     cmd_buf,

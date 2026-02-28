@@ -408,16 +408,23 @@ impl ApplicationHandler for MetalshaderApp {
                 }
             }
             WindowEvent::Resized(new_size) => {
+                if new_size.width > 0 && new_size.height > 0 {
+                    if let Some(renderer) = &mut self.renderer {
+                        match renderer.recreate_swapchain() {
+                            Ok(_) => println!("Swapchain recreated for {}x{}", new_size.width, new_size.height),
+                            Err(e) => eprintln!("Failed to recreate swapchain: {}", e),
+                        }
+                    }
+                }
+                if let Some(window) = &self.window {
+                    window.request_redraw();
+                }
+            }
+            WindowEvent::ScaleFactorChanged { .. } => {
+                // Display resolution/DPI changed — swapchain must be recreated
                 if let Some(renderer) = &mut self.renderer {
-                    match renderer.recreate_swapchain() {
-                        Ok(_) => {
-                            println!("Swapchain recreated for {}x{}", new_size.width, new_size.height);
-                            // Trigger shader reload to recreate pipeline with new viewport
-                            self.reload_requested = true;
-                        }
-                        Err(e) => {
-                            eprintln!("Failed to recreate swapchain: {}", e);
-                        }
+                    if let Err(e) = renderer.recreate_swapchain() {
+                        eprintln!("Failed to recreate swapchain on scale change: {}", e);
                     }
                 }
                 if let Some(window) = &self.window {
