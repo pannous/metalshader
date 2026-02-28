@@ -256,7 +256,14 @@ impl ApplicationHandler for MetalshaderApp {
                 .with_title("Metalshader - Vulkan Shader Viewer")
                 .with_inner_size(winit::dpi::PhysicalSize::new(1280, 800));
 
-            let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
+            let window = match event_loop.create_window(window_attributes) {
+                Ok(w) => Arc::new(w),
+                Err(e) => {
+                    eprintln!("Failed to create window: {}", e);
+                    event_loop.exit();
+                    return;
+                }
+            };
 
             // Create renderer with swapchain
             match SwapchainRenderer::new(window.clone()) {
