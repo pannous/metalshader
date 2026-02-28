@@ -95,15 +95,27 @@ impl ResolutionManager {
             .map(|m| m.width as f64 / m.height as f64)
             .unwrap_or(16.0 / 9.0);
 
-        let (pool, slot, slots) = if key <= 5 {
-            let matching: Vec<usize> = (0..self.modes.len())
+        if key <= 5 {
+            // Keys 1-5 target fractions of native width: 1/3, 1/2, 2/3, 5/6, 1
+            let native_w = self.modes.last().map(|m| m.width).unwrap_or(3840);
+            let targets = [
+                native_w / 3,          // key 1 — e.g. 1280
+                native_w / 2,          // key 2 — e.g. 1920 (half resolution)
+                native_w * 2 / 3,      // key 3 — e.g. 2560
+                native_w * 5 / 6,      // key 4 — e.g. 3200
+                native_w,              // key 5 — native
+            ];
+            let target_w = targets[(key - 1) as usize];
+
+            // Find the 16:9 mode with width closest to target
+            let best = (0..self.modes.len())
                 .filter(|&i| {
-                    let m = &self.modes[i];
-                    let r = m.width as f64 / m.height as f64;
-                    (r - native_ratio).abs() < 0.02 && m.width >= 1280
+                    let r = self.modes[i].width as f64 / self.modes[i].height as f64;
+                    (r - native_ratio).abs() < 0.02
                 })
-                .collect();
-            (matching, (key - 1) as usize, 4usize)
+                .min_by_key(|&i| (self.modes[i].width as isize - target_w as isize).unsigned_abs())
+                .ok_or_else(|| format!("No 16:9 mode near {}px wide", target_w))?;
+            self.set_index(best)
         } else {
             let other: Vec<usize> = (0..self.modes.len())
                 .filter(|&i| {
@@ -111,14 +123,13 @@ impl ResolutionManager {
                     (r - native_ratio).abs() >= 0.02
                 })
                 .collect();
-            (other, (key - 6) as usize, 3usize)
-        };
-
-        if pool.is_empty() {
-            return Err(format!("No modes available for key {}", key));
+            if other.is_empty() {
+                return Err(format!("No other-aspect modes for key {}", key));
+            }
+            let slot = (key - 6) as usize;
+            let idx = (slot * (other.len() - 1)) / 3;
+            self.set_index(other[idx])
         }
-        let pool_idx = (slot * (pool.len() - 1)) / slots.max(1);
-        self.set_index(pool[pool_idx])
     }
 
     fn set_index(&mut self, idx: usize) -> Result<(usize, usize), String> {
