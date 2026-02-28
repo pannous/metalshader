@@ -169,9 +169,25 @@ impl MetalshaderApp {
     }
 
     fn change_resolution(&mut self, key: u8) {
-        match self.resolution_manager.set_by_key(key) {
-            Ok((w, h)) => println!("\n[{}] Hardware resolution -> {}x{}", key, w, h),
-            Err(e) => eprintln!("\n[{}] Resolution change failed: {}", key, e),
+        let is_fullscreen = self.window.as_ref()
+            .map(|w| w.fullscreen().is_some())
+            .unwrap_or(false);
+
+        if is_fullscreen {
+            // Change actual hardware display resolution
+            match self.resolution_manager.set_by_key(key) {
+                Ok((w, h)) => println!("\n[{}] Hardware resolution -> {}x{}", key, w, h),
+                Err(e) => eprintln!("\n[{}] Resolution change failed: {}", key, e),
+            }
+        } else {
+            // Windowed: just resize the window
+            let sizes = [(1024u32, 576u32), (1280, 720), (1920, 1080), (3840, 2160)];
+            if let Some(&(w, h)) = sizes.get((key - 1) as usize) {
+                if let Some(window) = &self.window {
+                    let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(w, h));
+                    println!("\n[{}] Window size -> {}x{}", key, w, h);
+                }
+            }
         }
     }
 
@@ -201,6 +217,7 @@ impl MetalshaderApp {
                 if let Some(window) = &self.window {
                     let is_fullscreen = window.fullscreen().is_some();
                     if is_fullscreen {
+                        self.resolution_manager.restore();
                         window.set_fullscreen(None);
                         println!("\n[F] Windowed mode");
                     } else {
