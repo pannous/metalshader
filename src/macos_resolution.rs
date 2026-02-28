@@ -96,15 +96,9 @@ impl ResolutionManager {
             .unwrap_or(16.0 / 9.0);
 
         if key <= 5 {
-            // Keys 1-5 target fractions of native width: 1/3, 1/2, 2/3, 5/6, 1
+            // Keys 1-4: fixed widths (find closest 16:9 mode to each target)
             let native_w = self.modes.last().map(|m| m.width).unwrap_or(3840);
-            let targets = [
-                native_w / 3,          // key 1 — e.g. 1280
-                native_w / 2,          // key 2 — e.g. 1920 (half resolution)
-                native_w * 2 / 3,      // key 3 — e.g. 2560
-                native_w * 5 / 6,      // key 4 — e.g. 3200
-                native_w,              // key 5 — native
-            ];
+            let targets = [1024usize, 1280, 1920, native_w];
             let target_w = targets[(key - 1) as usize];
 
             // Find the 16:9 mode with width closest to target

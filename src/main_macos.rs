@@ -170,16 +170,7 @@ impl MetalshaderApp {
 
     fn change_resolution(&mut self, key: u8) {
         match self.resolution_manager.set_by_key(key) {
-            Ok((w, h)) => {
-                println!("\n[{}] Hardware resolution -> {}x{}", key, w, h);
-                // Fullscreen fills the new hardware resolution exactly
-                if let Some(window) = &self.window {
-                    use winit::window::Fullscreen;
-                    if let Some(monitor) = window.current_monitor() {
-                        window.set_fullscreen(Some(Fullscreen::Borderless(Some(monitor))));
-                    }
-                }
-            }
+            Ok((w, h)) => println!("\n[{}] Hardware resolution -> {}x{}", key, w, h),
             Err(e) => eprintln!("\n[{}] Resolution change failed: {}", key, e),
         }
     }
@@ -225,7 +216,6 @@ impl MetalshaderApp {
             PhysicalKey::Code(KeyCode::Digit2) => self.change_resolution(2),
             PhysicalKey::Code(KeyCode::Digit3) => self.change_resolution(3),
             PhysicalKey::Code(KeyCode::Digit4) => self.change_resolution(4),
-            PhysicalKey::Code(KeyCode::Digit5) => self.change_resolution(5),
             PhysicalKey::Code(KeyCode::KeyR) => {
                 let elapsed = self.start_time.elapsed().as_secs_f32();
                 self.scroll_x = 0.0;
