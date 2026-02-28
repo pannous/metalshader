@@ -225,7 +225,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Print FPS
         frame_count += 1;
-        if frame_count % 60 == 0 {
+        if frame_count % 600 == 0 {
             let fps = frame_count as f32 / elapsed;
             println!(
                 "{:.1}s: {} frames ({:.1} FPS) - {}",

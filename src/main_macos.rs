@@ -401,7 +401,7 @@ impl ApplicationHandler for MetalshaderApp {
                         match renderer.render_frame(&ubo) {
                             Ok(_) => {
                                 self.frame_count += 1;
-                                if self.frame_count % 60 == 0 {
+                                if self.frame_count % 600 == 0 {
                                     let fps = self.frame_count as f32 / elapsed;
                                     println!(
                                         "{:.1}s: {} frames ({:.1} FPS) - {}",
