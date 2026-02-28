@@ -123,11 +123,14 @@ impl MetalshaderApp {
             shader_manager.print_available();
         }
 
-        // Extract base name from shader path for shader manager lookup
-        let base_shader_path = std::path::Path::new(&resolved_path)
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or(shader_path);
+        // Extract base name: strip double extensions (.vert.spv, .frag.spv → base name)
+        let stem1 = std::path::Path::new(&resolved_path)
+            .file_stem().and_then(|s| s.to_str()).unwrap_or(shader_path);
+        let base_shader_path = if stem1.ends_with(".vert") || stem1.ends_with(".frag") || stem1.ends_with(".glsl") {
+            std::path::Path::new(stem1).file_stem().and_then(|s| s.to_str()).unwrap_or(stem1)
+        } else {
+            stem1
+        };
 
         let current_shader_idx = shader_manager
             .find_by_name(base_shader_path)
