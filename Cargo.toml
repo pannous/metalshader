@@ -27,6 +27,8 @@ input-linux = "0.7"  # Latest available on crates.io
 winit = "0.30"        # Cross-platform windowing and input
 raw-window-handle = "0.6"  # For Vulkan surface creation
 ash-window = "0.13"   # Helper for creating Vulkan surfaces from windows
+objc2 = "0.5.2"
+objc2-foundation = { version = "0.2.2", features = ["NSObject", "NSArray", "NSURL"] }
 
 [profile.release]
 opt-level = 3
