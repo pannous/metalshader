@@ -19,8 +19,8 @@ else
     echo "Building natively..."
     cargo build --release
     if [ $? -eq 0 ]; then
-        cp target/release/metalshader ./metalshader-rust
-        echo "✓ Build successful: ./metalshader-rust"
+        cp target/release/metalshader ./metalshader
+        echo "✓ Build successful: ./metalshader"
         ls -lh metalshader-rust
     else
         echo "✗ Build failed"
