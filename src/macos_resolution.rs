@@ -87,16 +87,38 @@ impl ResolutionManager {
         }
     }
 
-    /// Set display mode by 1-based key (1=lowest, 5=highest, spread evenly)
+    /// Set display mode by 1-based key.
+    /// Keys 1-5: evenly spread across native-aspect (16:9) modes ≥1280px wide.
+    /// Keys 6-9: evenly spread across other-aspect modes.
     pub fn set_by_key(&mut self, key: u8) -> Result<(usize, usize), String> {
-        let n = self.modes.len();
-        if n == 0 {
-            return Err("No display modes available".into());
+        let native_ratio = self.modes.last()
+            .map(|m| m.width as f64 / m.height as f64)
+            .unwrap_or(16.0 / 9.0);
+
+        let (pool, slot, slots) = if key <= 5 {
+            let matching: Vec<usize> = (0..self.modes.len())
+                .filter(|&i| {
+                    let m = &self.modes[i];
+                    let r = m.width as f64 / m.height as f64;
+                    (r - native_ratio).abs() < 0.02 && m.width >= 1280
+                })
+                .collect();
+            (matching, (key - 1) as usize, 4usize)
+        } else {
+            let other: Vec<usize> = (0..self.modes.len())
+                .filter(|&i| {
+                    let r = self.modes[i].width as f64 / self.modes[i].height as f64;
+                    (r - native_ratio).abs() >= 0.02
+                })
+                .collect();
+            (other, (key - 6) as usize, 3usize)
+        };
+
+        if pool.is_empty() {
+            return Err(format!("No modes available for key {}", key));
         }
-        // Map key 1..=5 to evenly spread indices across available modes
-        let idx = ((key as usize - 1) * (n - 1)) / 4;
-        let idx = idx.min(n - 1);
-        self.set_index(idx)
+        let pool_idx = (slot * (pool.len() - 1)) / slots.max(1);
+        self.set_index(pool[pool_idx])
     }
 
     fn set_index(&mut self, idx: usize) -> Result<(usize, usize), String> {
