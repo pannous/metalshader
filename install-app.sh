@@ -13,6 +13,9 @@ echo "Installing to $APP..."
 cp target/release/metalshader "$BINARY"
 rsync -a --delete shaders/ "$SHADERS/"
 
+echo "Ad-hoc signing..."
+codesign --force --deep --sign - "$APP"
+
 echo "Re-registering with Launch Services..."
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP"
 
