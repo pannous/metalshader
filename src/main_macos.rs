@@ -181,7 +181,7 @@ impl MetalshaderApp {
             }
         } else {
             // Windowed: just resize the window
-            let sizes = [(1024u32, 576u32), (1280, 720), (1920, 1080), (3840, 2160)];
+            let sizes = [(1024u32, 576u32), (1280, 720), (1920, 1080), (2560, 1440), (3840, 2160)];
             if let Some(&(w, h)) = sizes.get((key - 1) as usize) {
                 if let Some(window) = &self.window {
                     let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(w, h));
@@ -235,6 +235,7 @@ impl MetalshaderApp {
             PhysicalKey::Code(KeyCode::Digit2) => self.change_resolution(2),
             PhysicalKey::Code(KeyCode::Digit3) => self.change_resolution(3),
             PhysicalKey::Code(KeyCode::Digit4) => self.change_resolution(4),
+            PhysicalKey::Code(KeyCode::Digit5) => self.change_resolution(5),
             PhysicalKey::Code(KeyCode::KeyR) => {
                 let elapsed = self.start_time.elapsed().as_secs_f32();
                 self.scroll_x = 0.0;
