@@ -25,6 +25,8 @@ mod platform;
 mod main_macos;
 #[cfg(target_os = "macos")]
 mod renderer_swapchain;
+#[cfg(target_os = "macos")]
+mod macos_resolution;
 
 // Platform-conditional imports
 #[cfg(target_os = "linux")]

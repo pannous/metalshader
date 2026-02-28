@@ -9,6 +9,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowId};
 
+use crate::macos_resolution::ResolutionManager;
 use crate::renderer_swapchain::SwapchainRenderer;
 use crate::shader::ShaderManager;
 use crate::shader_compiler::ShaderCompiler;
@@ -34,6 +35,7 @@ struct MetalshaderApp {
     shader_manager: ShaderManager,
     #[allow(dead_code)]
     shader_compiler: ShaderCompiler,
+    resolution_manager: ResolutionManager,
     current_shader_idx: usize,
     start_time: Instant,
     frame_count: u32,
@@ -141,6 +143,7 @@ impl MetalshaderApp {
             renderer: None,
             shader_manager,
             shader_compiler,
+            resolution_manager: ResolutionManager::new(),
             current_shader_idx,
             start_time: Instant::now(),
             frame_count: 0,
@@ -162,6 +165,13 @@ impl MetalshaderApp {
             base_pan_x: 0.0,
             base_pan_y: 0.0,
             last_frame_time: Instant::now(),
+        }
+    }
+
+    fn change_resolution(&mut self, key: u8) {
+        match self.resolution_manager.set_by_key(key) {
+            Ok((w, h)) => println!("\n[{}] Hardware resolution -> {}x{}", key, w, h),
+            Err(e) => eprintln!("\n[{}] Resolution change failed: {}", key, e),
         }
     }
 
@@ -202,30 +212,11 @@ impl MetalshaderApp {
                     }
                 }
             }
-            PhysicalKey::Code(KeyCode::Digit1) => {
-                if let Some(window) = &self.window {
-                    let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(800, 600));
-                    println!("\n[1] Resolution: 800x600");
-                }
-            }
-            PhysicalKey::Code(KeyCode::Digit2) => {
-                if let Some(window) = &self.window {
-                    let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(1280, 800));
-                    println!("\n[2] Resolution: 1280x800");
-                }
-            }
-            PhysicalKey::Code(KeyCode::Digit3) => {
-                if let Some(window) = &self.window {
-                    let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(1920, 1080));
-                    println!("\n[3] Resolution: 1920x1080 (Full HD)");
-                }
-            }
-            PhysicalKey::Code(KeyCode::Digit4) => {
-                if let Some(window) = &self.window {
-                    let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(3840, 2160));
-                    println!("\n[4] Resolution: 3840x2160 (4K)");
-                }
-            }
+            PhysicalKey::Code(KeyCode::Digit1) => self.change_resolution(1),
+            PhysicalKey::Code(KeyCode::Digit2) => self.change_resolution(2),
+            PhysicalKey::Code(KeyCode::Digit3) => self.change_resolution(3),
+            PhysicalKey::Code(KeyCode::Digit4) => self.change_resolution(4),
+            PhysicalKey::Code(KeyCode::Digit5) => self.change_resolution(5),
             PhysicalKey::Code(KeyCode::KeyR) => {
                 let elapsed = self.start_time.elapsed().as_secs_f32();
                 self.scroll_x = 0.0;
@@ -281,6 +272,12 @@ impl ApplicationHandler for MetalshaderApp {
                     event_loop.exit();
                     return;
                 }
+            }
+
+            // Start fullscreen so resolution changes always fill the screen
+            use winit::window::Fullscreen;
+            if let Some(monitor) = window.current_monitor() {
+                window.set_fullscreen(Some(Fullscreen::Borderless(Some(monitor))));
             }
 
             self.window = Some(window);
