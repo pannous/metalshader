@@ -217,9 +217,11 @@ impl MetalshaderApp {
                 if let Some(window) = &self.window {
                     let is_fullscreen = window.fullscreen().is_some();
                     if is_fullscreen {
+                        let size = window.inner_size();
                         self.resolution_manager.restore();
                         window.set_fullscreen(None);
-                        println!("\n[F] Windowed mode");
+                        let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(size.width, size.height));
+                        println!("\n[F] Windowed mode at {}x{}", size.width, size.height);
                     } else {
                         use winit::window::Fullscreen;
                         if let Some(monitor) = window.current_monitor() {
