@@ -1,7 +1,7 @@
 // macOS-specific main with windowed swapchain support
 #![cfg(target_os = "macos")]
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, WindowEvent};
@@ -9,10 +9,59 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowId};
 
+use objc2::ffi::class_addMethod;
+use objc2::runtime::{AnyClass, AnyObject, Sel};
+use objc2::sel;
+use objc2_foundation::{NSArray, NSURL};
+
 use crate::macos_resolution::ResolutionManager;
 use crate::renderer_swapchain::SwapchainRenderer;
 use crate::shader::ShaderManager;
 use crate::shader_compiler::ShaderCompiler;
+
+// Global channel for file-open Apple Events → shader switcher
+static PENDING_FILE: Mutex<Option<String>> = Mutex::new(None);
+
+/// Injected into WinitApplicationDelegate via class_addMethod after EventLoop::new().
+/// Signature: - (void)application:(NSApplication*)app openURLs:(NSArray<NSURL*>*)urls
+extern "C" fn open_urls_handler(_this: &AnyObject, _sel: Sel, _app: *mut AnyObject, urls: *mut AnyObject) {
+    eprintln!("[metalshader] open_urls_handler called");
+    // urls is NSArray<NSURL>
+    let count: usize = unsafe { objc2::msg_send![urls, count] };
+    eprintln!("[metalshader] URL count: {}", count);
+    for i in 0..count {
+        let url: *mut AnyObject = unsafe { objc2::msg_send![urls, objectAtIndex: i] };
+        let path: *mut AnyObject = unsafe { objc2::msg_send![url, path] };
+        if !path.is_null() {
+            let utf8: *const std::ffi::c_char = unsafe { objc2::msg_send![path, UTF8String] };
+            if !utf8.is_null() {
+                let s = unsafe { std::ffi::CStr::from_ptr(utf8) }.to_string_lossy().into_owned();
+                if let Ok(mut guard) = PENDING_FILE.lock() {
+                    *guard = Some(s);
+                }
+            }
+        }
+    }
+}
+
+/// Inject open_urls_handler into winit's WinitApplicationDelegate class.
+/// Must be called after EventLoop::new() so the class is registered.
+fn inject_open_urls_handler() {
+    let sel = sel!(application:openURLs:);
+    // type encoding: void, self(id), SEL, id(app), id(urls)
+    let types = c"v@:@@";
+    unsafe {
+        if let Some(cls) = AnyClass::get("WinitApplicationDelegate") {
+            eprintln!("[metalshader] Injecting openURLs into WinitApplicationDelegate");
+            class_addMethod(
+                cls as *const AnyClass as *mut _,
+                sel.as_ptr(),
+                Some(std::mem::transmute::<extern "C" fn(&AnyObject, Sel, *mut AnyObject, *mut AnyObject), unsafe extern "C" fn()>(open_urls_handler)),
+                types.as_ptr(),
+            );
+        }
+    }
+}
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -123,17 +172,10 @@ impl MetalshaderApp {
             shader_manager.print_available();
         }
 
-        // Extract base name: strip double extensions (.vert.spv, .frag.spv → base name)
-        let stem1 = std::path::Path::new(&resolved_path)
-            .file_stem().and_then(|s| s.to_str()).unwrap_or(shader_path);
-        let base_shader_path = if stem1.ends_with(".vert") || stem1.ends_with(".frag") || stem1.ends_with(".glsl") {
-            std::path::Path::new(stem1).file_stem().and_then(|s| s.to_str()).unwrap_or(stem1)
-        } else {
-            stem1
-        };
+        let base_shader_path = MetalshaderApp::shader_name_from_path(&resolved_path);
 
         let current_shader_idx = shader_manager
-            .find_by_name(base_shader_path)
+            .find_by_name(&base_shader_path)
             .unwrap_or(0);
 
         println!("Starting with shader: {}",
@@ -327,6 +369,9 @@ impl ApplicationHandler for MetalshaderApp {
                             ) {
                                 Ok(_) => {
                                     println!("Loaded shader: {}", shader_info.name);
+                                    if let Some(window) = &self.window {
+                                        window.set_title(&format!("Metalshader - {}", shader_info.name));
+                                    }
                                     self.reload_requested = false;
                                 }
                                 Err(e) => {
@@ -507,8 +552,33 @@ impl ApplicationHandler for MetalshaderApp {
     }
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        // Check for Finder "Open With" file requests arriving via Apple Event
+        if let Ok(mut guard) = PENDING_FILE.lock() {
+            if let Some(path) = guard.take() {
+                let base = MetalshaderApp::shader_name_from_path(&path);
+                if let Some(idx) = self.shader_manager.find_by_name(&base) {
+                    self.current_shader_idx = idx;
+                    self.reload_requested = true;
+                    self.start_time = Instant::now();
+                    self.scroll_y = 0.0;
+                }
+            }
+        }
         if let Some(window) = &self.window {
             window.request_redraw();
+        }
+    }
+}
+
+impl MetalshaderApp {
+    fn shader_name_from_path(path: &str) -> String {
+        let stem1 = std::path::Path::new(path)
+            .file_stem().and_then(|s| s.to_str()).unwrap_or(path);
+        if stem1.ends_with(".vert") || stem1.ends_with(".frag") || stem1.ends_with(".glsl") {
+            std::path::Path::new(stem1).file_stem()
+                .and_then(|s| s.to_str()).unwrap_or(stem1).to_string()
+        } else {
+            stem1.to_string()
         }
     }
 }
@@ -517,8 +587,10 @@ pub fn run_macos(shader_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
 
-    let mut app = MetalshaderApp::new(shader_path);
+    // Inject application:openURLs: into winit's delegate to handle Finder "Open With"
+    inject_open_urls_handler();
 
+    let mut app = MetalshaderApp::new(shader_path);
     event_loop.run_app(&mut app)?;
 
     Ok(())
